@@ -1,0 +1,613 @@
+  /* ================================================
+    Google Fonts
+    ================================================ */
+  @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap');
+
+  /* ================================================
+    Reset
+    ================================================ */
+  *,
+  *::before,
+  *::after {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  html,
+  body,
+  #root {
+    width: 100%;
+    min-height: 100%;
+  }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: #f7f6f4;
+  }
+
+  /* ================================================
+    Page — full viewport, centered
+    ================================================ */
+  .design-section {
+    min-height: 100vh;
+    min-height: 100dvh;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background: #f7f6f4;
+    position: relative;
+    overflow-y: auto;
+  }
+
+  /* Subtle background grid texture */
+  .design-section::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    /* background-image:
+      linear-gradient(rgba(0,0,0,0.025) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,0,0,0.025) 1px, transparent 1px); */
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* ================================================
+    Owl logo inside card — top center
+    ================================================ */
+  .card-brand {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 6px;
+    animation: fadeDown 0.5s ease both;
+  }
+
+  .card-brand-name {
+    font-family: 'Syne', sans-serif;
+    font-size: 20px;
+    font-weight: 800;
+    color: #111;
+    letter-spacing: 0.3px;
+  }
+
+  .card-brand-tag {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    color: rgba(0, 0, 0, 0.35);
+    letter-spacing: 2.5px;
+    text-transform: uppercase;
+    border: 1px solid rgba(0, 0, 0, 0.10);
+    padding: 3px 10px;
+    border-radius: 50px;
+  }
+
+  .card-brand-divider {
+    width: 100%;
+    height: 1px;
+    background: #efefef;
+    margin: 20px 0 28px;
+  }
+
+  /* ================================================
+    Brand bar — REMOVED (now inside card)
+    ================================================ */
+
+
+  /* ================================================
+    Card
+    ================================================ */
+  .auth-card {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    max-width: 420px;
+    background: #ffffff;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: 16px;
+    padding: 36px 44px 44px;
+    box-shadow:
+      0 1px 2px rgba(0, 0, 0, 0.04),
+      0 8px 32px rgba(0, 0, 0, 0.06),
+      0 24px 64px rgba(0, 0, 0, 0.04);
+    animation: fadeUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.1s both;
+  }
+
+  @keyframes fadeUp {
+    from {
+      opacity: 0;
+      transform: translateY(16px);
+    }
+
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes fadeDown {
+    from {
+      opacity: 0;
+      transform: translateY(-10px);
+    }
+
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  /* ================================================
+    Step Indicator
+    ================================================ */
+  .d3-form-header {
+    margin-bottom: 36px;
+  }
+
+  .d3-step-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .d3-step {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    border: 1.5px solid #ddd;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    font-family: 'Space Mono', monospace;
+    color: #bbb;
+    flex-shrink: 0;
+    transition: all 0.3s ease;
+  }
+
+  .d3-step.active {
+    background: #111;
+    border-color: #111;
+    color: white;
+  }
+
+  .d3-step.done {
+    background: #111;
+    border-color: #111;
+    color: white;
+  }
+
+  .d3-step-line {
+    flex: 1;
+    height: 1px;
+    background: #e8e8e8;
+  }
+
+  /* ================================================
+    Form content
+    ================================================ */
+  .phone-step,
+  .otp-step {
+    animation: stepIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  @keyframes stepIn {
+    from {
+      opacity: 0;
+      transform: translateX(10px);
+    }
+
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+  .d3-form-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 28px;
+    font-weight: 400;
+    color: #111;
+    margin-bottom: 6px;
+  }
+
+  .d3-form-sub {
+    font-size: 13px;
+    color: #999;
+    line-height: 1.6;
+    margin-bottom: 32px;
+  }
+
+  /* ── Field ── */
+  .d3-field {
+    margin-bottom: 20px;
+  }
+
+  .d3-field label {
+    display: block;
+    font-size: 10px;
+    font-family: 'Space Mono', monospace;
+    color: #999;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+
+  .d3-input-wrap {
+    display: flex;
+    align-items: center;
+    border-bottom: 1.5px solid #e0e0e0;
+    transition: border-color 0.2s;
+  }
+
+  .d3-input-wrap:focus-within {
+    border-color: #111;
+  }
+
+  .d3-prefix {
+    font-size: 14px;
+    color: #aaa;
+    padding-right: 10px;
+    font-family: 'Space Mono', monospace;
+    flex-shrink: 0;
+  }
+
+  .d3-input {
+    flex: 1;
+    border: none;
+    background: transparent;
+    outline: none;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 16px;
+    font-weight: 500;
+    color: #111;
+    padding: 10px 0;
+    min-width: 0;
+  }
+
+  .d3-input::placeholder {
+    color: #ccc;
+  }
+
+  /* ── Error message ── */
+  .auth-error {
+    font-size: 12px;
+    color: #e03d3d;
+    margin-bottom: 14px;
+    font-family: 'Space Mono', monospace;
+    letter-spacing: 0.3px;
+    padding: 10px 12px;
+    background: #fff5f5;
+    border: 1px solid #fecdcd;
+    border-radius: 6px;
+  }
+
+  /* ── reCAPTCHA container ── */
+  #recaptcha-container {
+    margin-bottom: 4px;
+  }
+
+  /* ── Primary Button ── */
+  .d3-btn {
+    width: 100%;
+    height: 50px;
+    background: #111;
+    border: none;
+    color: white;
+    font-family: 'Syne', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    cursor: pointer;
+    border-radius: 8px;
+    transition: background 0.2s, transform 0.15s, opacity 0.2s;
+    margin-bottom: 22px;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
+
+  .d3-btn:hover {
+    background: #2a2a2a;
+    transform: translateY(-1px);
+  }
+
+  .d3-btn:active {
+    transform: translateY(0);
+  }
+
+  .d3-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+  }
+
+  /* ── Divider ── */
+  .d3-divider {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 14px;
+    color: #ccc;
+    font-size: 10px;
+    font-family: 'Space Mono', monospace;
+    letter-spacing: 1px;
+  }
+
+  .d3-divider::before,
+  .d3-divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: #ebebeb;
+  }
+
+  /* ── Social Buttons ── */
+  .d3-social {
+    display: flex;
+    gap: 10px;
+  }
+
+  .d3-social-btn {
+    flex: 1;
+    height: 44px;
+    background: transparent;
+    border: 1.5px solid #e5e5e5;
+    color: #555;
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    cursor: pointer;
+    border-radius: 8px;
+    transition: border-color 0.2s, color 0.2s, background 0.2s;
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 500;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .d3-social-btn:hover {
+    border-color: #111;
+    color: #111;
+    background: #fafafa;
+  }
+
+  /* ── OTP boxes ── */
+  .d3-otp-row {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 28px;
+  }
+
+  .d3-otp-input {
+    flex: 1;
+    height: 58px;
+    border: 1.5px solid #e5e5e5;
+    border-radius: 8px;
+    background: #fafafa;
+    text-align: center;
+    font-family: 'Syne', sans-serif;
+    font-size: 22px;
+    font-weight: 700;
+    color: #111;
+    outline: none;
+    transition: border-color 0.2s, background 0.2s;
+    caret-color: #111;
+    min-width: 0;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .d3-otp-input:focus {
+    border-color: #111;
+    background: #fff;
+  }
+
+  /* ── Helper text ── */
+  .auth-helper {
+    text-align: center;
+    font-size: 12px;
+    color: #bbb;
+    margin-top: 16px;
+    font-family: 'DM Sans', sans-serif;
+  }
+
+  .auth-link {
+    color: #111;
+    cursor: pointer;
+    font-weight: 600;
+    text-decoration: underline;
+    transition: opacity 0.2s;
+  }
+
+  .auth-link:hover {
+    opacity: 0.6;
+  }
+
+  /* ── Success state ── */
+  .auth-success {
+    text-align: center;
+    animation: stepIn 0.3s ease both;
+  }
+
+  .auth-success-icon {
+    width: 56px;
+    height: 56px;
+    background: #111;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 20px;
+    font-size: 22px;
+  }
+
+  /* ── Icons ── */
+  .icon-google,
+  .icon-ms {
+    width: 17px;
+    height: 17px;
+    flex-shrink: 0;
+  }
+
+  /* ================================================
+    Footer text
+    ================================================ */
+  .auth-footer {
+    position: relative;
+    z-index: 1;
+    margin-top: 28px;
+    font-size: 11px;
+    color: #bbb;
+    font-family: 'Space Mono', monospace;
+    letter-spacing: 0.5px;
+    animation: fadeUp 0.5s ease 0.3s both;
+  }
+
+  /* ================================================
+    Responsive
+    ================================================ */
+  @media (max-width: 480px) {
+    .design-section {
+      padding: 20px 16px;
+      justify-content: flex-start;
+      padding-top: 48px;
+    }
+
+    .auth-card {
+      padding: 36px 24px 32px;
+      border-radius: 12px;
+    }
+
+    .auth-brand {
+      margin-bottom: 28px;
+    }
+
+    .d3-form-title {
+      font-size: 24px;
+    }
+
+    .d3-otp-input {
+      height: 50px;
+      font-size: 18px;
+    }
+
+    .d3-otp-row {
+      gap: 7px;
+    }
+
+    .d3-social {
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .d3-social-btn {
+      height: 46px;
+    }
+  }
+
+  @media (max-width: 375px) {
+    .auth-card {
+      padding: 28px 18px 28px;
+    }
+
+    .d3-form-title {
+      font-size: 22px;
+    }
+
+    .d3-otp-input {
+      height: 46px;
+      font-size: 16px;
+    }
+
+    .d3-otp-row {
+      gap: 5px;
+    }
+
+    .d3-step {
+      width: 22px;
+      height: 22px;
+      font-size: 9px;
+    }
+  }
+
+  .card-brand img {
+    width: 130px;
+    height: 130px;
+    object-fit: contain;
+    margin-bottom: 16px;
+    transition: transform 0.3s ease;
+  }
+
+  .card-brand img:hover {
+    transform: scale(1.05);
+  }
+
+  .continue_with_google {
+    height: 50px;
+    background-color: rgb(233, 233, 233);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+
+  }
+
+  .cwg_text {
+    margin-right: 10px;
+    border: none;
+
+  }
+
+  .line1 {
+    height: 1px;
+    background: linear-gradient(to right, #ccc, #000, #ccc);
+    margin: 20px 0;
+    width: 40%
+  }
+
+  .line_or {
+    display: flex;
+    align-items: center;
+    justify-content: space-evenly;
+
+  }
+
+  .line2 {
+    height: 1px;
+    background: linear-gradient(to right, #ccc, #000, #ccc);
+    margin: 20px 0;
+    width: 40%
+  }
+
+  .or_text {
+    margin-left: 4px;
+    margin-right: 4px;
+
+  }
+
+ .custom_email_field {
+  width: 100%;
+  max-width: 400px;
+}
+
+.custom_email_field input {
+  width: 100%;
+  padding: 12px 14px;
+  font-size: 14px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  outline: none;
+  transition: all 0.2s ease;
+  text-align: center;
+}
+
+.custom_email_field input:focus {
+  border-color:black;
+}

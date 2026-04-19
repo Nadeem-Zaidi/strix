@@ -1,0 +1,32 @@
+@keyframes morph {
+  0%   { border-radius: 8px;  transform: rotate(0deg)   scale(1);   }
+  25%  { border-radius: 50%;  transform: rotate(90deg)  scale(0.8); }
+  50%  { border-radius: 8px;  transform: rotate(180deg) scale(1);   }
+  75%  { border-radius: 50%;  transform: rotate(270deg) scale(0.8); }
+  100% { border-radius: 8px;  transform: rotate(360deg) scale(1);   }
+}
+
+@keyframes color-cycle {
+  0%,100% { background: #4285F4; }
+  25%     { background: #EA4335; }
+  50%     { background: #FBBC05; }
+  75%     { background: #34A853; }
+}
+
+.loader {
+  width: 36px;
+  height: 36px;
+  animation:
+    morph       2s ease-in-out infinite,
+    color-cycle 2s ease-in-out infinite;
+}
+
+.rag_loader_main{
+    display:flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background-color: white;
+    padding: 10px;
+    border-radius: 10px;
+}
