@@ -14,7 +14,7 @@ const firebaseConfig = {
   projectId: "owl-agent-11953",
   storageBucket: "owl-agent-11953.firebasestorage.app",
   messagingSenderId: "255830645169",
-  appId: "1:255830645169:web:2ac30b8be9b984e383c590",
+  appId: "your app id",
   measurementId: "G-T7ZFQ3SY7E"
 };
 
