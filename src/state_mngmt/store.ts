@@ -7,6 +7,7 @@ import { useDispatch, useSelector, type TypedUseSelectorHook } from "react-redux
 import fileExplorerUi from "./slices/file_explorer_ui_slice";
 import sessionReducer from "./slices/message_slice";
 import filesReducer from "./slices/filereader_slice";
+import folderCreationReducer from "./slices/create_folder";
 
 export const store = configureStore({
   reducer: {
@@ -17,6 +18,8 @@ export const store = configureStore({
     fileExplorerUi:fileExplorerUi,
     session:sessionReducer,
     files: filesReducer,
+    folderCreation:folderCreationReducer
+
 
   },
 });

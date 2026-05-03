@@ -85,11 +85,32 @@ export type FilesList={
   prefix:string,
   key:string,
   size:number,
-  lastModified:string
+  lastModified:string,
+  url:string
 }
 
 export type FilesResult={
   files:Folder[] | FilesList[],
   nextToken:string | undefined |null
 }
+
+type FolderItem = { type: "folder"; name: string; path: string };
+export type FileListItem = {
+  type: "file";
+  name: string;
+  prefix: string;
+  key: string;
+  size: number;
+  lastModified: string;
+};
+type ListItem = FolderItem | FileItem;
+
+export type SortField = "name" | "size" | "modified";
+export type SortDir = "asc" | "desc";
+export type ViewMode = "list" | "grid";
+export type ContextMenuState = { x: number; y: number; item: ListItem } | null;
+
+export type ExtMeta = { color: string; bg: string; label: string };
+
+export type Action = { label: string; onClick: () => void; danger?: boolean };
 

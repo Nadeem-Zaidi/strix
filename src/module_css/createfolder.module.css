@@ -7,7 +7,7 @@
     justify-content: center;
     align-items: center;
     background: rgba(0, 0, 0, 0.45);
-    backdrop-filter: blur(6px);
+    /* backdrop-filter: blur(6px); */
     -webkit-backdrop-filter: blur(6px);
     z-index: 1000;
     animation: fadeIn 0.18s ease;
@@ -23,12 +23,16 @@
     background: #ffffff;
     border-radius: 20px;
     width: 420px;
+    max-width: calc(100vw - 40px);
     padding: 28px 28px 20px;
     display: flex;
     flex-direction: column;
     gap: 20px;
     box-shadow: 0 24px 60px rgba(0, 0, 0, 0.14), 0 4px 16px rgba(0, 0, 0, 0.06);
     animation: slideUp 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+    /* KEY FIX: prevent children from overflowing */
+    overflow: hidden;
+    box-sizing: border-box;
 }
 
 @keyframes slideUp {
@@ -46,6 +50,9 @@
 .modal_content {
     display: flex;
     flex-direction: column;
+    /* KEY FIX: constrain content width */
+    width: 100%;
+    min-width: 0;
 }
 
 /* ── Field group ── */
@@ -53,6 +60,8 @@
     display: flex;
     flex-direction: column;
     gap: 7px;
+    width: 100%;
+    min-width: 0;
 }
 
 .field_label {
@@ -64,12 +73,14 @@
 }
 
 .field_group:focus-within .field_label {
-    color: #EF9F27;
+    color: #378ADD;
 }
 
 .field {
     position: relative;
     width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
 }
 
 .folder_icon {
@@ -82,14 +93,16 @@
     transition: color 0.2s;
     display: flex;
     align-items: center;
+    z-index: 1;
 }
 
 .field_group:focus-within .folder_icon {
-    color: #EF9F27;
+    color: #378ADD;
 }
 
 .field_input {
     width: 100%;
+    box-sizing: border-box;
     padding: 12px 40px 12px 40px;
     font-family: 'DM Sans', sans-serif;
     font-size: 14.5px;
@@ -101,6 +114,7 @@
     outline: none;
     transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
     appearance: none;
+    display: block;
 }
 
 .field_input::placeholder {
@@ -109,8 +123,8 @@
 
 .field_input:focus {
     background: #ffffff;
-    border-color: #EF9F27;
-    box-shadow: 0 0 0 3.5px rgba(239, 159, 39, 0.13);
+    border-color: #378ADD;
+    box-shadow: 0 0 0 3.5px rgba(55, 138, 221, 0.13);
 }
 
 .clear_btn {
@@ -192,15 +206,16 @@
     font-size: 13.5px;
     font-weight: 500;
     color: #ffffff;
-    background: #EF9F27;
+    background: #378ADD;
     border: 1.5px solid transparent;
     border-radius: 10px;
     cursor: pointer;
-    transition: background 0.15s, transform 0.1s;
+    transition: background 0.15s, transform 0.1s, box-shadow 0.15s;
 }
 
 .btn_primary:hover {
-    background: #d98d1e;
+    background: #185FA5;
+    box-shadow: 0 4px 12px rgba(55, 138, 221, 0.3);
 }
 
 .btn_primary:active {
@@ -208,6 +223,7 @@
 }
 
 .btn_primary:disabled {
-    background: #F5D79E;
+    background: #B5D4F4;
+    box-shadow: none;
     cursor: not-allowed;
 }

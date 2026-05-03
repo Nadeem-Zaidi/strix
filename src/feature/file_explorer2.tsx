@@ -1,30 +1,20 @@
-import './ef2.css'
-import FileExplore3r from './file_list'
+import styles from '../module_css/file_explorer.module.css';
+import {FileList} from './file_list';
 
-
-export const FileExplorer2 = () => {
-    return <>
-        <div className="file_explorer_main">
-            <div className='tool_bar'>
-                <h2>Strix</h2>
-
-                <div className='tool_bar_left'>
-                    <h4>Settings</h4>
+export const UsersFileExplorer = () => {
+    return (
+        <div className={styles.file_explorer_main}>
+            <div className={styles.file_explorer_appbar}>
+                <div className={styles.file_explorer_appbar__logo}></div>
+            </div>
+            <div className={styles['file_explorer_main__components']}>
+                <div className={styles.file_explorer_appdrawer}>
+                    AppDrawer
+                </div>
+                <div className={styles.file_explorer_content}>
+                    <FileList/>
                 </div>
             </div>
-            <div className='file_explorer_content'>
-                <div className='file_explorer_sidebar'>
-                    <h4>Sidebar</h4>
-                </div>
-
-                <div className='file_explorer_files'>
-                    <h4>Contetn</h4>
-                    <FileExplore3r />
-
-                </div>
-
-            </div>
-
         </div>
-    </>
-}
+    );
+};

@@ -97,14 +97,80 @@ export const api = {
       method: "GET",
       headers
     });
-    if(!response.ok) throw new Error("Failed to fetch the files");
-    const result=await response.json();
+    if (!response.ok) throw new Error("Failed to fetch the files");
+    const result = await response.json();
+    console.log(result)
     return {
-      files:result.files,
-      nextToken:result.nextToken
+      files: result.files,
+      nextToken: result.nextToken
     }
   },
-  deleteFile:async()=>{
+  deleteFile: async (keys: string[]) => {
+    const headers = await getAuthHeader();
+    if (!keys.length) {
+      throw new Error("No files to delete")
+    }
+    const res = await fetch(`${BASE}/delete`, {
 
+      method: 'DELETE',
+      headers,
+      body: JSON.stringify({ keys })
+
+    });
+
+    if (!res.ok) throw new Error('Delete Failed')
+    return await res.json()
+
+
+  },
+  uploadFile: async (files: File[], prefix: string = ''): Promise<void> => {
+    try {
+      const user = auth.currentUser ?? await new Promise<any>((resolve) => {
+        const unsubscribe = onAuthStateChanged(auth, (user) => {
+          unsubscribe();
+          resolve(user);
+        });
+      });
+
+      if (!user) throw new Error("Not authenticated");
+
+      const token = await user.getIdToken();
+
+      const formData = new FormData();
+      files.forEach(file => formData.append('files', file));
+      formData.append('prefix', prefix);
+
+      const res = await fetch(`${BASE}/upload`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`, // ✅ ONLY this
+        },
+        body: formData,
+      });
+
+      if (!res.ok) throw new Error('Upload failed');
+
+      return res.json();
+    } catch (error) {
+      console.log(error);
+      throw error;
+    }
+  },
+  createFolder: async (folderName: string) => {
+    const headers = await getAuthHeader();
+    let url: string = `${BASE}/createFolder`;
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ folderName: folderName })
+
+      });
+      if (!res.ok) throw new Error("Folder creation failed")
+      const result = await res.json();
+      return result
+    } catch (error) {
+      throw error;
+    }
   }
 };

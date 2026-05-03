@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, type KeyboardEvent } from 'react';
+import { useState, useRef, useEffect, type KeyboardEvent, useId } from 'react';
 import {
     RecaptchaVerifier,
     signInWithPhoneNumber,
@@ -21,6 +21,7 @@ import { authStart, authSuccess } from '../state_mngmt/slices/authentication_sli
 import { Firebase_Storage } from '../db/firebase_storage';
 import { User } from '../entity/users/user';
 import { s3 } from '../s3_uploader/s3_uploader';
+import { api } from '../helper/helper_api_functions';
 
 
 declare global {
@@ -41,9 +42,6 @@ export const AuthMain = () => {
     const [otp, setOtp] = useState(['', '', '', '', '', '']);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
-    const [userInfoRequired, setuserInfoRequired] = useState<boolean>(false)
-    const [name, setName] = useState<string>("")
-    const [email, setEmail] = useState<string>("")
     const [authChecked, setAuthChecked] = useState(false);
 
     const otpRefs = useRef<(HTMLInputElement | null)[]>([]);
@@ -77,10 +75,10 @@ export const AuthMain = () => {
                 );
 
                 const existing = await database.getByField("email", firebaseUser.email);
-                
+
 
                 if (existing.length && existing[0].email && existing[0].phone) {
-                    
+
                     navigate('/chathome');
                 } else if (existing.length && existing[0].email && !existing[0].phone) {
                     await database.deleteOne(firebaseUser.uid);
@@ -163,7 +161,15 @@ export const AuthMain = () => {
             await confirmationRef.current.confirm(code);
             const currentuser = auth.currentUser;
             if (!currentuser) {
-                throw new Error("No user after confirmation")
+                throw new Error("Error in creating user")
+            }
+            const createFolder=await api.createFolder(currentuser.uid.toString().trim())
+            if(!createFolder.success){
+                throw new Error("Error in creating work space")
+            }
+            const createFileInFolder=await api.createFolder(`${currentuser.uid.toString().trim()}/strix.st`)
+            if(!createFileInFolder.success){
+                throw new Error("Error in creating work space ")
             }
             const existing = await database.getByField("email", currentuser.email);
             if (!existing.length) {
@@ -172,10 +178,11 @@ export const AuthMain = () => {
                     currentuser.phoneNumber ?? '',
                     currentuser.displayName ?? '',
                     currentuser.email ?? '',
+                    createFolder.folder,
                     currentuser.uid,
                 );
                 await database.createOne(newUser);
-                await s3.putObject("docs/data.json", JSON.stringify({ name: currentuser.displayName }), "application/json");
+                
                 navigate("/chathome")
             }
         } catch {
@@ -245,6 +252,9 @@ export const AuthMain = () => {
             </div>
         );
     }
+    console.log("Is Authenticated ")
+    console.log(isAuthenticated)
+    console.log("Is authenticated")
     return (
 
         <section className="design-section">

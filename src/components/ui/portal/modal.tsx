@@ -11,3 +11,4 @@ export const Modal=({children}:ModelProps)=>{
     return createPortal(children,modelRoot)
 
 }
+

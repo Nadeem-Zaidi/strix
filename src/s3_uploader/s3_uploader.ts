@@ -19,7 +19,7 @@ export class S3_Uploader implements IFileUploader {
             },
         });
     }
-    async putObject(key: string, body: string | Uint8Array, contentType: string="application/octet-stream"): Promise<void> {
+    async  putObject(key: string, body: string | Uint8Array, contentType: string="application/octet-stream"): Promise<void> {
         const putCommand=new PutObjectCommand({
             Bucket:this.config.bucket,
             Body:body,

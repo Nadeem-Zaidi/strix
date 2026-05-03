@@ -1,0 +1,32 @@
+.file_explorer_main {
+    display: flex;
+    flex-direction: column;
+    background-color: rgb(159, 92, 92);
+    height: 100vh;
+}
+
+.file_explorer_appbar {
+    min-height: 60px;
+    background-color: #eee;
+}
+
+/* Fixed typo: explorere → explorer */
+.file_explorer_appbar__logo {}
+
+.file_explorer_main__components {
+    display: flex;
+    flex: 1;
+}
+
+.file_explorer_appdrawer {
+    display: flex;
+    flex-direction: column;
+    width: 300px;
+    /* Removed height: 100% — flex stretch handles this */
+    background-color: whitesmoke;
+}
+
+.file_explorer_content {
+    flex: 1;
+    background-color:white;
+}

@@ -1,0 +1,37 @@
+.clbutton {
+  display: inline-flex;            /* better for buttons */
+  align-items: center;
+  justify-content: center;
+  gap: 8px;                        /* spacing between elements */
+  padding: 8px 14px;               /* instead of fixed width */
+  border-radius: 6px;
+  cursor: pointer;
+  user-select: none;
+  border: none;                    /* useful if you switch to <button> */
+  outline: none;
+  background-color: whitesmoke;
+}
+
+/* Hover + active states */
+.clbutton:hover {
+  background-color:grey;
+}
+
+.clbutton:active {
+  transform: scale(0.98);
+}
+
+/* Leading / trailing icons */
+.clbutton__leading,
+.clbutton__trailing {
+  display: flex;
+  align-items: center;
+  font-size: 16px;
+}
+
+/* Text */
+.clbutton__title {
+  white-space: nowrap;
+  font-size: 14px;
+  font-weight: 500;
+}

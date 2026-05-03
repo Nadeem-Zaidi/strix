@@ -8,14 +8,17 @@ export class User implements Mappable {
     email: string;
     uid: string;
     createdAt: Timestamp;
+    folder:string;
 
-    constructor(id: string, phone: string, name: string, email: string, uid: string, createdAt?: Timestamp) {
+    constructor(id: string, phone: string, name: string, email: string, folder:string,uid: string, createdAt?: Timestamp) {
         this.id = id;
         this.phone = phone;
         this.name = name;
         this.email = email;
         this.uid = uid;
+        this.folder=folder,
         this.createdAt = createdAt ?? Timestamp.now();
+        
     }
 
     static fromMap(map: Record<string, any>): User {
@@ -25,6 +28,7 @@ export class User implements Mappable {
             map["name"],
             map["email"],
             map["uid"],
+            map["folder"],
             map["createdAt"] instanceof Timestamp
                 ? map["createdAt"]
                 : Timestamp.now()
@@ -38,6 +42,7 @@ export class User implements Mappable {
             name: this.name,
             email: this.email,
             uid: this.uid,
+            folder:this.folder,
             createdAt: this.createdAt,
         };
     }
