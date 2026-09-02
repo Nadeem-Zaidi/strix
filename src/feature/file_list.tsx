@@ -1,51 +1,49 @@
 import { CLButton } from '../components/ui/clbutton';
 import styles from '../module_css/file_explorer_list.module.css';
-import { useDispatch } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import { useAppSelector, type AppDispatch, type RootState } from '../state_mngmt/store';
-import { deleteFiles, getFiles, uploadFiles } from '../state_mngmt/slices/filereader_slice';
+import { addpath, deleteFiles, generateRAG, getFiles, resetPath, slicePath, uploadFiles } from '../state_mngmt/slices/filereader_slice';
 import { ActionMenuWrapper } from '../utils/action';
-import { useEffect, useRef, useState } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
 import type { Action } from '../types';
 import { FolderIcon } from '../utils/folder_icon';
-import { FileIcon } from '../utils/file_icon'; 
-import { TestModal } from '../components/ui/portal/test_model';
+import { FileIcon } from '../utils/file_icon';
 import { CreateFolder } from '../components/ui/dialog_box/create_folder';
+import { selectAllItems, selectIsSelected, selectItems, selectSelectedKeys, toggleItem } from '../state_mngmt/slices/select_item_slice';
 
 const getExt = (name: string) => name.split('.').pop() ?? '';
+
 export const FileList = () => {
     const dispatch = useDispatch<AppDispatch>();
     const fileInputRef = useRef<HTMLInputElement>(null);
-    const files = useAppSelector((state: RootState) => state.files.fileList);
-    const [createFolderDilaog,setCreateFolderDialog]=useState<boolean>(false);
+    const { fileList: files, breadCrumb, loading } = useSelector((s: RootState) => s.files);
+    const [createFolderDialog, setCreateFolderDialog] = useState<boolean>(false);
+    const selectedItems = useAppSelector(selectItems)
+    const items=useAppSelector(selectSelectedKeys)
 
-    useEffect(() => {
-        dispatch(getFiles(undefined));
-    }, []);
 
-    const newActions = (): Action[] => {
-        return [
-            {
-                label: "Folder",
-                onClick: () => {
-                    setCreateFolderDialog(true)
-                }
-            },
-            {
-                label: "File",
-                onClick: () => {
-
-                }
-            },
-            {
-                label: "Upload",
-                onClick: () => {
-                    fileInputRef.current?.click()
-
-                }
-            }
-        ]
-
+    const checked = (file: any) => {
+        dispatch(toggleItem(file))
     }
+    useEffect(() => {
+        const prefix = breadCrumb.length > 0 ? `${breadCrumb.join('/')}/` : undefined;
+        dispatch(getFiles({ prefix, nextToken: undefined }));
+    }, [breadCrumb]);
+
+    const newActions = (): Action[] => [
+        {
+            label: 'Folder',
+            onClick: () => setCreateFolderDialog(true),
+        },
+        {
+            label: 'File',
+            onClick: () => { },
+        },
+        {
+            label: 'Upload',
+            onClick: () => fileInputRef.current?.click(),
+        },
+    ];
 
     const getActions = (file: typeof files[number]): Action[] => {
         const isFile = file.type === 'file';
@@ -54,14 +52,14 @@ export const FileList = () => {
                 label: 'View',
                 onClick: () => {
                     if ('url' in file && file.url) window.open(file.url, '_blank');
-                }
+                },
             }] : []),
             {
                 label: 'Copy path',
                 onClick: () => {
                     const path = 'key' in file ? file.key : file.path;
                     navigator.clipboard.writeText(path);
-                }
+                },
             },
             {
                 label: 'Rename',
@@ -72,25 +70,38 @@ export const FileList = () => {
                 danger: true,
                 onClick: () => {
                     if ('key' in file) dispatch(deleteFiles([file.key]));
-                }
+                },
             },
         ];
     };
 
     const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const files = Array.from(e.target.files ?? []);
-        if (!files.length) return;
-        // user is inside docs/reports/ folder
-        dispatch(uploadFiles({ files, prefix: 'docs/' }));
+        const selectedFiles = Array.from(e.target.files ?? []);
+        if (!selectedFiles.length) return;
+        const prefix = breadCrumb.length > 0 ? `${breadCrumb.join('/')}/` : '';
 
-    }
-     const onClose=()=>{
-        setCreateFolderDialog(false)
-     }
+        dispatch(uploadFiles({ files: selectedFiles, prefix: prefix }));
+    };
+
+    const handleFolderClick = (file: typeof files[number]) => {
+        if (file.type === 'folder') {
+            dispatch(addpath(file.name));
+        }
+    };
+
+    const handleCrumbClick = (index: number) => {
+        // index = -1 means root
+        if (index === -1) {
+            dispatch(resetPath());
+        } else {
+            dispatch(slicePath(index + 1));
+        }
+    };
 
     return (
         <div>
-            {createFolderDilaog && <CreateFolder onClose={onClose}/>}
+            {createFolderDialog && <CreateFolder onClose={() => setCreateFolderDialog(false)} />}
+
             <div className={styles.file_list_main}>
                 <div className={styles.file_list_toolbar}>
                     <div>
@@ -101,16 +112,52 @@ export const FileList = () => {
                             style={{ display: 'none' }}
                             onChange={handleFileUpload}
                         />
-                        <ActionMenuWrapper actions={newActions()} children=<CLButton
-                            title="New"
-                            size="sm"
-                            leading={
-                                <svg width="20" height="20" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                    <line x1="12" y1="4" x2="12" y2="20" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
-                                    <line x1="4" y1="12" x2="20" y2="12" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
-                                </svg>
+                        <ActionMenuWrapper
+                            actions={newActions()}
+                            children={
+                                <CLButton
+                                    title="New"
+                                    size="sm"
+                                    leading={
+                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                                            <line x1="12" y1="5" x2="12" y2="19" />
+                                            <line x1="5" y1="12" x2="19" y2="12" />
+                                        </svg>
+                                    }
+                                />
                             }
-                        /> />
+                        />
+                    </div>
+                    <div className={styles.toolbar_divider} />
+                    <nav className={styles.breadcrumb}>
+                        <span
+                            className={`${styles.crumb} ${breadCrumb.length === 0 ? styles.crumb_active : ''}`}
+                            onClick={() => handleCrumbClick(-1)}
+                        >
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
+                                <polyline points="9 22 9 12 15 12 15 22" />
+                            </svg>
+                            Root
+                        </span>
+
+                        {breadCrumb.map((segment, i) => {
+                            const isLast = i === breadCrumb.length - 1;
+                            return (
+                                <Fragment key={i}>
+                                    <span className={styles.crumb_chevron}>›</span>
+                                    <span
+                                        className={`${styles.crumb} ${isLast ? styles.crumb_active : ''}`}
+                                        onClick={() => !isLast && handleCrumbClick(i)}
+                                    >
+                                        {segment}
+                                    </span>
+                                </Fragment>
+                            );
+                        })}
+                    </nav>
+                    <div>
+                        <button onClick={()=>dispatch(generateRAG({prefix:breadCrumb.join(",")}))}>Generate Rag</button>
                     </div>
 
                 </div>
@@ -120,7 +167,11 @@ export const FileList = () => {
                         <thead>
                             <tr>
                                 <th className={styles.col_check}>
-                                    <input type="checkbox" className={styles.checkbox} />
+                                    <input
+                                        type="checkbox"
+                                        className={styles.checkbox}
+                                        onChange={() => dispatch(selectAllItems(files))}
+                                    />
                                 </th>
                                 <th>Name</th>
                                 <th>Type</th>
@@ -129,13 +180,17 @@ export const FileList = () => {
                             </tr>
                         </thead>
                         <tbody>
-                            {files.map((file, index) => (
-                                <tr key={index}>
+                            {files.map((file, index) => {
+                                const key='key' in file?file.key:file.path;
+                                return <tr key={index}>
                                     <td className={styles.col_check}>
-                                        <input type="checkbox" className={styles.checkbox} />
+                                        <input
+                                            type="checkbox"
+                                            className={styles.checkbox}
+                                            checked={!!selectedItems[key] }
+                                            onChange={() => checked(file)}
+                                        />
                                     </td>
-
-                                    {/* Name cell with icon */}
                                     <td
                                         style={{
                                             cursor: file.type === 'file' ? 'pointer' : 'default',
@@ -146,6 +201,8 @@ export const FileList = () => {
                                         onClick={() => {
                                             if (file.type === 'file' && 'url' in file && file.url) {
                                                 window.open(file.url, '_blank');
+                                            } else if (file.type === 'folder') {
+                                                handleFolderClick(file)
                                             }
                                         }}
                                     >
@@ -155,7 +212,6 @@ export const FileList = () => {
                                         }
                                         {file.name}
                                     </td>
-
                                     <td>{file.type}</td>
                                     <td>
                                         {file.type === 'file' && 'lastModified' in file
@@ -165,15 +221,13 @@ export const FileList = () => {
                                     </td>
                                     <td style={{ textAlign: 'center' }}>
                                         <ActionMenuWrapper actions={getActions(file)} children=<div>⋮</div> />
-                                        {/* <ActionsMenu actions={getActions(file)} /> */}
                                     </td>
                                 </tr>
-                            ))}
+                            })}
                         </tbody>
                     </table>
                 </div>
             </div>
         </div>
-
     );
 };

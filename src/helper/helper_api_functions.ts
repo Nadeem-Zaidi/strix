@@ -35,8 +35,7 @@ export const api = {
 
   newSession: async (): Promise<Session> => {
     const headers = await getAuthHeader();
-    const res = await fetch(`${BASE}/newsessions`, {
-      method: "POST",
+    const res = await fetch(`${BASE}/api/new_session`, {
       headers,
     });
     if (!res.ok) throw new Error("Failed to create session");
@@ -78,6 +77,7 @@ export const api = {
     const result = await res.json();
     return result;
   },
+  
 
   deleteSession: async (sessionId: string): Promise<void> => {
     const headers = await getAuthHeader();
@@ -87,22 +87,30 @@ export const api = {
     });
   },
 
-  getFiles: async (nextToken: string | undefined): Promise<FilesResult> => {
+  getFiles: async (nextToken?: string, prefix?: string | null): Promise<FilesResult> => {
     const headers = await getAuthHeader();
-    let url: string = `${BASE}/getFiles`;
-    if (nextToken) {
-      url += `?token=${nextToken}`;
-    }
-    const response = await fetch(url, {
-      method: "GET",
-      headers
-    });
-    if (!response.ok) throw new Error("Failed to fetch the files");
-    const result = await response.json();
-    console.log(result)
-    return {
-      files: result.files,
-      nextToken: result.nextToken
+    try {
+      const params = new URLSearchParams();
+      if (nextToken) params.set("token", nextToken);
+      if (prefix) params.set("prefix", prefix);
+
+      const query = params.toString();
+      const url = `${BASE}/getFiles${query ? `?${query}` : ""}`;
+
+      const response = await fetch(url, {
+        method: "GET",
+        headers,
+      });
+
+      if (!response.ok) throw new Error("Failed to fetch the files");
+      const result = await response.json();
+      return {
+        files: result.files,
+        nextToken: result.nextToken
+      };
+    } catch (error) {
+      console.log(error);
+      throw error;
     }
   },
   deleteFile: async (keys: string[]) => {
@@ -138,8 +146,9 @@ export const api = {
 
       const formData = new FormData();
       files.forEach(file => formData.append('files', file));
-      formData.append('prefix', prefix);
 
+      formData.append('prefix', prefix);
+      console.log([...formData.entries()])
       const res = await fetch(`${BASE}/upload`, {
         method: 'POST',
         headers: {
@@ -172,5 +181,26 @@ export const api = {
     } catch (error) {
       throw error;
     }
+  },
+
+  generateRag: async (prefix: string) => {
+    const headers = await getAuthHeader();
+    let url: string = `${BASE}/rag_generator`;
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ prefix: prefix })
+      })
+      if (!res.ok) throw new Error("Rag Generation Failed")
+      const result = await res.json()
+      return result
+
+    } catch (error) {
+      throw error
+
+    }
+
+
   }
 };

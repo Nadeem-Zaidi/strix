@@ -252,9 +252,6 @@ export const AuthMain = () => {
             </div>
         );
     }
-    console.log("Is Authenticated ")
-    console.log(isAuthenticated)
-    console.log("Is authenticated")
     return (
 
         <section className="design-section">

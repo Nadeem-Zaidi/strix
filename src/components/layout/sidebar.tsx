@@ -1,46 +1,66 @@
-import "../../global/chat.css"
+import "../../global/chat.css";
 
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faBars,
   faPenToSquare,
   faMagnifyingGlass,
-} from '@fortawesome/free-solid-svg-icons'
-import { useDispatch, useSelector } from 'react-redux'
-import { toggleSideBar } from '../../state_mngmt/slices/toggle_sidebar'
-import { useEffect } from "react"
-import { fetchMessages, fetchSessions, setCurrentSession } from "../../state_mngmt/slices/message_slice"
-import { useAppDispatch, useAppSelector } from "../../state_mngmt/store"
-import { onAuthStateChanged } from "firebase/auth"
-import { auth } from "../../firebase/firebase_config"
+  faDatabase,
+} from "@fortawesome/free-solid-svg-icons";
+import { useSelector } from "react-redux";
+import { toggleSideBar } from "../../state_mngmt/slices/toggle_sidebar";
+import { useEffect } from "react";
+import { useAppDispatch, useAppSelector } from "../../state_mngmt/store";
+import { onAuthStateChanged } from "firebase/auth";
+import { auth } from "../../firebase/firebase_config";
+import {
+  loadMessages,
+  loadSessions,
+  setActiveSession,
+  clearCacheMessage,
+  setChatMode,
+} from "../../state_mngmt/slices/session_slice_practice";
+import { useNavigate } from "react-router-dom";
 
 export const SideDrawer = () => {
-  const showSideBar = useSelector((state: any) => state.sideBar.showSideBar)
-  const dispatch = useDispatch()
-  const appDispatch = useAppDispatch()
-  const { sessions, currentSessionId } = useAppSelector(state => state.session)
+  const navigate = useNavigate();
+  const showSideBar = useSelector((state: any) => state.sideBar.showSideBar);
+  const dispatch = useAppDispatch();
+  const windowId = 'chat-page';
+
+  // `sessions` is global/shared across every chat window.
+  const { sessions } = useAppSelector((state) => state.session);
+  // `activeSessionId` and `chatMode` are per-window — the sidebar acts on
+  // the same window the chat page renders (CHAT_WINDOW_ID).
+  const activeSessionId = useAppSelector((state) => state.session.windows[windowId]?.activeSessionId ?? null);
+  const chatMode = useAppSelector((state) => state.session.windows[windowId]?.chatMode ?? false);
 
   const toggleSideBarFunc = () => {
-    dispatch(toggleSideBar())
-  }
+    dispatch(toggleSideBar());
+  };
 
-  const handleClick = (s: string) => {
-    appDispatch(fetchMessages(s))
-    appDispatch(setCurrentSession(s));
-  }
+  const handleClick = (sessionId: string) => {
+    dispatch(setActiveSession({ windowId, sessionId }));
+    dispatch(loadMessages({ windowId, sessionId }));
+  };
+
+  const handleNewChat = () => {
+    dispatch(setActiveSession({ windowId, sessionId: null }));
+    dispatch(clearCacheMessage({ windowId }));
+    dispatch(setChatMode({ windowId, chatMode: false }));
+  };
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user) {
-        appDispatch(fetchSessions())
+        dispatch(loadSessions());
       }
-    })
-    return () => unsubscribe()
-  }, [appDispatch])
+    });
+    return () => unsubscribe();
+  }, [dispatch]);
 
   return (
     <div className={showSideBar ? "sidebar" : "sidebar collapsed"}>
-      {/* ─── Top Section ─────────────────────────────── */}
       <div className="sidebar_topsection">
         {showSideBar && <h2 className="sidebar_brand">Strix</h2>}
         <button className="toggle_btn" onClick={toggleSideBarFunc}>
@@ -48,35 +68,40 @@ export const SideDrawer = () => {
         </button>
       </div>
 
-      {/* ─── Actions ─────────────────────────────────── */}
       <ul className="menu">
-        <li className="menu_item">
+        <li className="menu_item" onClick={handleNewChat}>
           <FontAwesomeIcon icon={faPenToSquare} className="menu_icon" />
           <span>New chat</span>
         </li>
         <li className="menu_item">
+          {/* TODO: no search feature/route exists yet — wire this up once
+              there's somewhere for it to go. */}
           <FontAwesomeIcon icon={faMagnifyingGlass} className="menu_icon" />
           <span>Search chats</span>
         </li>
-        <li className="menu_item">
-          <FontAwesomeIcon icon={faMagnifyingGlass} className="menu_icon" />
+        <li className="menu_item" onClick={() => navigate("/file_explorer")}>
+          <FontAwesomeIcon icon={faDatabase} className="menu_icon" />
           <span>Create RAG</span>
         </li>
       </ul>
 
       {/* ─── Chat History ────────────────────────────── */}
-      {showSideBar && <div className="sidebar_chat_section">
-        {showSideBar && <div className="chat_section_label">Recents</div>}
-        {sessions?.map((session) => (
-          <div
-            key={session.id}
-            className={`chat_history_item ${session.id === currentSessionId ? "chat_history_active" : ""}`}
-            onClick={() => handleClick(session.id)}
-          >
-            <span className="chat_history_title">{session.title || "New Chat"}</span>
-          </div>
-        ))}
-      </div>}
+      {showSideBar && (
+        <div className="sidebar_chat_section">
+          <div className="chat_section_label">Recents</div>
+          {sessions?.map((session) => (
+            <div
+              key={session.id}
+              className={`chat_history_item ${
+                session.id === activeSessionId ? "chat_history_active" : ""
+              }`}
+              onClick={() => handleClick(session.id)}
+            >
+              <span className="chat_history_title">{session.title || "New Chat"}</span>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* ─── Bottom ──────────────────────────────────── */}
       <div className="sidebar_bottom_section">
@@ -85,7 +110,7 @@ export const SideDrawer = () => {
             <div className="user_avatar">
               {auth.currentUser?.displayName
                 ?.split(" ")
-                .map(n => n[0])
+                .map((n) => n[0])
                 .join("")
                 .toUpperCase()
                 .slice(0, 2) || "?"}
@@ -98,5 +123,5 @@ export const SideDrawer = () => {
         )}
       </div>
     </div>
-  )
-}
+  );
+};

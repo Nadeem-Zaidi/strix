@@ -1,23 +1,40 @@
 import { createSlice, type PayloadAction } from "@reduxjs/toolkit"
+const STORAGE_KEY = "chat_state"
 
-interface ChatMode {
+interface ChatState {
     chatMode: boolean
+    currentSessionId?: string | null
 }
 
-const initialState: ChatMode = {
-    chatMode: sessionStorage.getItem("chat_mode") === "true"
+const loadInitialState = ():ChatState => {
+    try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) {
+            return { chatMode: false, currentSessionId: null }
+        }
+        return JSON.parse(raw)
+    } catch (err: any) {
+        return { chatMode: false, currentSessionId: null }
+
+    }
 }
+
+
 
 export const chatModeSlice = createSlice({
     name: 'chatMode',
-    initialState,
+    initialState:loadInitialState,
     reducers: {
-        changeChatMode: (state, action: PayloadAction<boolean>) => {
-            state.chatMode = action.payload
-            sessionStorage.setItem("chat_mode", String(action.payload))
+        updateChatMode: (state, action: PayloadAction<ChatState>) => {
+            state.chatMode = action.payload.chatMode
+            state.currentSessionId = action.payload.currentSessionId ? action.payload.currentSessionId : null
+            localStorage.setItem(STORAGE_KEY, JSON.stringify({
+                chatMode: state.chatMode,
+                currentSessionId: state.currentSessionId,
+            }))
         }
     }
 })
 
-export const { changeChatMode } = chatModeSlice.actions
+export const { updateChatMode } = chatModeSlice.actions
 export default chatModeSlice.reducer

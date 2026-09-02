@@ -1,36 +1,24 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { Message } from "../types";
+import type { LLMMessage } from "../types";
 import { getAuthHeader } from "../helper/helper_api_functions";
 import { useAppSelector, useAppDispatch } from "../state_mngmt/store";
 import { addSession, fetchMessages, setCurrentSession, updateSessionTitle } from "../state_mngmt/slices/message_slice";
 
 export const useChatStream = (endpoint: string) => {
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messages, setMessages] = useState<LLMMessage[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
-  const { currentSessionId } = useAppSelector((state) => state.session);
+  const { currentSessionId } = useAppSelector((state) => state.sessionState);
   const dispatch = useAppDispatch();
 
   const abortRef = useRef<AbortController | null>(null);
   const streamBuffer = useRef("");
   const botMessageAdded = useRef(false);
 
-  useEffect(() => {
-    if (currentSessionId) {
-      dispatch(fetchMessages(currentSessionId))
-        .unwrap()
-        .then(({ messages }) => {
-          setMessages(messages);
-        })
-        .catch((err) => console.error("Failed to load messages:", err));
-    } else {
-      setMessages([]);
-    }
-  }, [dispatch, currentSessionId]);
 
   const sendMessage = useCallback(
-    async (text: string, images: any[] = []) => {
+    async (llmMessage: LLMMessage) => {
       if (isStreaming) return;
-      setMessages((prev) => [...prev, { role: "user", text }]);
+      setMessages((prev) => [...prev, llmMessage]);
 
       setIsStreaming(true);
       streamBuffer.current = "";
@@ -41,14 +29,12 @@ export const useChatStream = (endpoint: string) => {
 
       try {
         const headers = await getAuthHeader();
-
         const res = await fetch(endpoint, {
           method: "POST",
           headers,
           body: JSON.stringify({
-            question: text,
-            images,
-            sessionId: currentSessionId, // null on first message — backend creates one
+            llmMessage: llmMessage,
+            sessionId: currentSessionId ?? "", // null on first message — backend creates one
           }),
           signal: controller.signal,
         });
@@ -72,11 +58,8 @@ export const useChatStream = (endpoint: string) => {
           for (const frame of frames) {
             const trimmed = frame.trim();
             if (!trimmed) continue;
-
-            // ─── Parse SSE fields ─────────────────────────────
-            let eventType = "message"; // default SSE event type
+            let eventType = "message";
             let data = "";
-
             for (const line of trimmed.split("\n")) {
               if (line.startsWith("event:")) {
                 eventType = line.slice(6).trim();
@@ -116,10 +99,9 @@ export const useChatStream = (endpoint: string) => {
               continue;
             }
 
-            if (eventType === "tool") {
+            if (eventType === "function_call") {
               try {
                 const toolInfo = JSON.parse(data);
-                // Optionally show a tool indicator in the UI
                 streamBuffer.current += `\n\n*🔧 Using tool: ${toolInfo.tool}...*\n\n`;
                 updateBotMessage(streamBuffer.current);
               } catch {
@@ -163,7 +145,7 @@ export const useChatStream = (endpoint: string) => {
           setMessages((prev) => {
             const updated = [...prev];
             const last = updated[updated.length - 1];
-            if (last?.role === "bot") {
+            if (last.role === "assistant") {
               updated[updated.length - 1] = { ...last, cancelled: true };
             }
             return updated;
@@ -172,7 +154,7 @@ export const useChatStream = (endpoint: string) => {
           console.error("Stream error:", err);
           setMessages((prev) => [
             ...prev.slice(0, botMessageAdded.current ? -1 : undefined),
-            { role: "bot" as const, text: "Something went wrong. Please try again." },
+            { role: "assistant", content: [{ type: "text", text: "Something went" }] } as LLMMessage
           ]);
         }
       } finally {
@@ -187,11 +169,11 @@ export const useChatStream = (endpoint: string) => {
   function updateBotMessage(text: string) {
     if (!botMessageAdded.current) {
       botMessageAdded.current = true;
-      setMessages((prev) => [...prev, { role: "bot", text }]);
+      setMessages((prev) => [...prev, { role: "assistant", content: [{ type: "text", text: text }] } as LLMMessage]);
     } else {
       setMessages((prev) => {
         const updated = [...prev];
-        updated[updated.length - 1] = { role: "bot", text };
+        updated[updated.length - 1] = { role: "assistant", content: [{ type: "text", text: text }] } as LLMMessage
         return updated;
       });
     }

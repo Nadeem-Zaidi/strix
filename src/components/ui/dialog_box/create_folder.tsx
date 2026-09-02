@@ -1,9 +1,11 @@
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { Modal } from "../portal/modal";
 import styles from '../../../module_css/createfolder.module.css';
-import { createFolderThunk, resetFolderCreation, setFolderName } from '../../../state_mngmt/slices/create_folder';
-import { useAppDispatch, useAppSelector } from '../../../state_mngmt/store';
+import { useAppDispatch, useAppSelector, type RootState } from '../../../state_mngmt/store';
+import { useSelector } from 'react-redux';
+import { createFolder, getFiles } from '../../../state_mngmt/slices/filereader_slice';
 
+// Remove the create_folder slice imports — they're no longer needed
 
 const INVALID = /[\/\\:*?"<>|]/;
 
@@ -13,59 +15,48 @@ interface Props {
     onCreated?: () => void;
 }
 
-export const CreateFolder = ({ prefix = "/docs", onClose, onCreated }: Props) => {
+export const CreateFolder = ({ prefix = "", onClose, onCreated }: Props) => {
     const dispatch = useAppDispatch();
-    const { loading, error, folderName } = useAppSelector(
-        (state) => state.folderCreation
-    );
 
+    const { loading, breadCrumb } = useSelector((s: RootState) => s.files);
+
+    const [folderName, setFolderName] = useState('');
     const inputRef = useRef<HTMLInputElement>(null);
+    const isInvalid = INVALID.test(folderName);
+    const canSubmit = folderName.trim().length > 0 && !isInvalid && !loading;
 
-    const isInvalid = !!folderName && INVALID.test(folderName);
-    const canSubmit = !!folderName?.trim() && !isInvalid && !loading;
+    const hint = isInvalid
+        ? { text: 'Name cannot contain \\ / : * ? " < > |', isError: true }
+        : { text: '', isError: false };
 
-    // ── hint logic ────────────────────────────────────────────────────────────
-    const hint = error
-        ? { text: error, type: 'error' as const }
-        : isInvalid
-        ? { text: 'Avoid special characters: / \\ : * ? " < > |', type: 'error' as const }
-        : folderName && folderName.length > 0
-        ? { text: `${folderName.length} / 60 characters`, type: 'default' as const }
-        : { text: 'Press Enter to confirm', type: 'default' as const };
-
-    const hintClass = [
-        styles.hint,
-        hint.type === 'error' ? styles.hint_error : '',
-    ].join(' ');
+    const hintClass = `${styles.hint} ${hint.isError ? styles.hint_error : ''}`;
 
     // ── handlers ──────────────────────────────────────────────────────────────
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        dispatch(setFolderName(e.target.value));
+        setFolderName(e.target.value);
     };
 
     const handleClear = () => {
-        dispatch(setFolderName(''));
+        setFolderName('');
         inputRef.current?.focus();
     };
 
     const handleClose = () => {
-        dispatch(resetFolderCreation());
+        setFolderName('');
         onClose();
     };
 
     const handleCreate = async () => {
         if (!canSubmit) return;
-
+        const currentPath = breadCrumb.length > 0 ? `${breadCrumb.join('/')}/` : '';
         const result = await dispatch(
-            createFolderThunk({ folderName: folderName!.trim(), prefix })
+            createFolder({ folderName: `${currentPath}${folderName.trim()}/`, prefix })
         );
 
-        if (createFolderThunk.fulfilled.match(result)) {
-            onCreated?.();   // ← tell parent to refresh file list
-            handleClose();   // ← close modal + reset state
-        }
-        // if rejected, error is already in Redux state
-        // the hint above will show it automatically
+        if (createFolder.fulfilled.match(result)) {
+            onCreated?.();
+            handleClose();
+        } 
     };
 
     const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {

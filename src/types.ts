@@ -1,14 +1,5 @@
 import type { IconDefinition } from "@fortawesome/fontawesome-svg-core";
 
-export type S3FILE = {
-  type: string;
-  name: string;
-  prefix: string;
-  lastModified: string;
-  size?: number;
-  url?:string;
-};
-
 export type BreadCrumb={name:string,prefix:string};
 
 export  type CustomIconProps={
@@ -60,12 +51,15 @@ export type Message = {
   cancelled?: boolean;
 };
 
-export type Session = {
-  id: string;
-  title: string;
-  last_message: string | null;
-  updated_at: string;
-};
+export type Session={
+  id:string
+  userid:string
+  title:string
+  model?:string|null
+  created_at:string
+  updated_at:string
+
+}
 export type BotMessageProps = {
   text: string;
   isStreaming?: boolean;
@@ -73,13 +67,13 @@ export type BotMessageProps = {
 };
 
 
-export type Folder={
+export type S3Folder={
   type:string;
   name:string;
   path:string;
 }
 
-export type FilesList={
+export type  S3File={
   type:string,
   name:string,
   prefix:string,
@@ -89,8 +83,10 @@ export type FilesList={
   url:string
 }
 
+export type S3FileType=S3Folder | S3File
+
 export type FilesResult={
-  files:Folder[] | FilesList[],
+  files:S3Folder[] | S3File[],
   nextToken:string | undefined |null
 }
 
@@ -113,4 +109,113 @@ export type ContextMenuState = { x: number; y: number; item: ListItem } | null;
 export type ExtMeta = { color: string; bg: string; label: string };
 
 export type Action = { label: string; onClick: () => void; danger?: boolean };
+export type TextContent = {
+    type: string;
+    text: string;
+};
 
+export type ToolCall = {
+    type: string,
+    id: string,
+    name: string,
+    arguments: Record<string, any>
+}
+
+export type ImageUrlContent = {
+    type: string;
+    image_url: {
+        url: string;
+        detail?: 'low' | 'high' | 'auto';
+    };
+};
+
+export type ImageId = {
+    type: string,
+    file_id: string
+
+}
+
+export type FileInput = {
+    type: string,
+    file_id: string,
+    fileName?: string,
+    fileExtension?: string
+}
+
+export type Tool = {
+    type: 'function';
+    function: {
+        name: string;
+        description: string;
+        parameters: Record<string, unknown>
+    }
+
+}
+
+export type ImageBase64Content = {
+    type: string;
+    source: {
+        type: 'base64';
+        media_type: 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp';
+        data: string;
+    };
+};
+
+export type ContentPart = TextContent | ImageUrlContent | ImageBase64Content | ImageId | ToolCall;
+
+export type LLMConfig = {
+    model: string;
+    apiKey?: string;
+    baseURL?: string;
+    temperature?: number;
+    maxTokens?: number;
+}
+
+export type LLMMessageToolCall = {
+    type: string;
+    id: string;
+    name: string;
+    call_id: string;
+    arguments: Record<string, any>
+    output: any
+}
+export type LLMMessage = {
+    id?: string,
+    role?: 'system' | 'user' | 'assistant' | 'tool' | 'tool_call' | 'tool_call_output';
+    content?: string | ContentPart[];
+    name?: string;
+    arguments?: Record<string, any>;
+    tool_call_id?: string;
+    output?: any;
+    type?: string;
+    isDone?:boolean
+    error?:string
+    cancelled?:boolean
+}
+
+export type ImageAttachment= {
+  previewUrl: string;
+  mimeType: string;
+  data: string;
+}
+
+export type TextAttachment= {
+  name: string;
+  content: string;
+}
+
+export type FileAttachment = {
+  name: string;
+  extension: string;
+  file: File;       // the actual blob, used for upload
+  isImage: boolean;
+};
+
+
+export type LLMFileUploadResponse={
+    name:string,
+    extension:string,
+    isImage:boolean,
+    fileId:string
+
+}
