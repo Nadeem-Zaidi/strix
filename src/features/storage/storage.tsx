@@ -1,0 +1,727 @@
+import { useEffect, useRef, useState } from 'react';
+import { GlowingAiSparkle } from './ai_icon';
+import './storage.css';
+import {
+  Search,
+  Sparkles,
+  SlidersHorizontal,
+  Settings2,
+  X,
+  Upload,
+  ChevronDown,
+  File as FileIcon,
+  FileText,
+  FileSpreadsheet,
+  FileImage,
+  FileCode2,
+  FolderUp,
+  CheckCircle2,
+  AlertCircle,
+  Loader2,
+  RotateCcw,
+  Trash2,
+  Check,
+} from 'lucide-react';
+import { ChatPage } from '../chat/chat';
+import {
+  useDeleteFilesMutation,
+  useListFilesQuery,
+  useUploadFilesMutation,
+} from './storage_api';
+
+const MAX_FILE_SIZE = 100 * 1024 * 1024;
+const MAX_CONCURRENT_UPLOADS = 3;
+const STORAGE_CHAT_WINDOW_ID = 'storage-chat';
+
+type UploadItem = {
+  id: string;
+  name: string;
+  size: number;
+  status: 'uploading' | 'success' | 'error';
+  errorMessage?: string;
+  file: File;
+};
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function getErrorMessage(err: unknown): string {
+  if (err && typeof err === 'object') {
+    const maybe = err as { data?: { error?: string }; error?: string };
+    if (maybe.data?.error) return maybe.data.error;
+    if (typeof maybe.error === 'string') return maybe.error;
+  }
+  return 'Something went wrong';
+}
+
+function getFileVisual(name: string): { Icon: typeof FileIcon; className: string } {
+  const ext = name.split('.').pop()?.toLowerCase() ?? '';
+  if (['pdf'].includes(ext)) return { Icon: FileText, className: 'file-icon--pdf' };
+  if (['doc', 'docx'].includes(ext)) return { Icon: FileText, className: 'file-icon--doc' };
+  if (['xls', 'xlsx', 'csv'].includes(ext)) return { Icon: FileSpreadsheet, className: 'file-icon--sheet' };
+  if (['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp'].includes(ext)) return { Icon: FileImage, className: 'file-icon--image' };
+  if (['js', 'ts', 'tsx', 'jsx', 'json', 'py', 'java', 'go', 'rs', 'html', 'css'].includes(ext)) {
+    return { Icon: FileCode2, className: 'file-icon--code' };
+  }
+  return { Icon: FileIcon, className: 'file-icon--default' };
+}
+
+type ConfirmDialogProps = {
+  title: string;
+  subtitle?: string;
+  confirmLabel: string;
+  confirmTone?: 'default' | 'danger';
+  confirmDisabled?: boolean;
+  confirmIcon?: React.ReactNode;
+  onCancel: () => void;
+  onConfirm: () => void;
+  children: React.ReactNode;
+};
+function ConfirmDialog({
+  title,
+  subtitle,
+  confirmLabel,
+  confirmTone = 'default',
+  confirmDisabled,
+  confirmIcon,
+  onCancel,
+  onConfirm,
+  children,
+}: ConfirmDialogProps) {
+  return (
+    <div className="modal-overlay" role="dialog" aria-modal="true" onClick={onCancel}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <div className="modal__header">
+          <div className="modal__header-text">
+            <div className="modal__title">{title}</div>
+            {subtitle && <div className="modal__subtitle">{subtitle}</div>}
+          </div>
+          <div className="modal__actions">
+            <button type="button" className="btn btn--ghost" onClick={onCancel}>
+              Cancel
+            </button>
+            <button
+              type="button"
+              className={`btn ${confirmTone === 'danger' ? 'btn--danger' : 'btn--primary'}`}
+              disabled={confirmDisabled}
+              onClick={onConfirm}
+            >
+              {confirmIcon}
+              {confirmLabel}
+            </button>
+          </div>
+        </div>
+        <div className="modal__body">{children}</div>
+      </div>
+    </div>
+  );
+}
+
+export function S3FolderBrowser() {
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [isUploadMenuOpen, setIsUploadMenuOpen] = useState(false);
+
+  const [uploadQueue, setUploadQueue] = useState<UploadItem[]>([]);
+  const [isUploadPanelOpen, setIsUploadPanelOpen] = useState(false);
+
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
+
+  // NEW: multi-select + delete
+  const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
+  const [keysPendingDelete, setKeysPendingDelete] = useState<string[] | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const folderInputRef = useRef<HTMLInputElement>(null);
+  const uploadMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (uploadMenuRef.current && !uploadMenuRef.current.contains(e.target as Node)) {
+        setIsUploadMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Cursor-based pagination: S3 only hands back a forward continuation token,
+  // so we cache the token that leads to each page we've visited, which lets us
+  // support a numbered Prev/Next pager instead of a one-way "Load more" button.
+  const [pageTokens, setPageTokens] = useState<(string | undefined)[]>([undefined]);
+  const [pageIndex, setPageIndex] = useState(0);
+  const currentPageToken = pageTokens[pageIndex];
+  const { data, isLoading, isFetching, error } = useListFilesQuery(currentPageToken);
+
+  useEffect(() => {
+    if (!data?.continuationToken) return;
+    setPageTokens((prev) => {
+      if (prev[pageIndex + 1] === data.continuationToken) return prev;
+      const next = prev.slice(0, pageIndex + 1);
+      next[pageIndex + 1] = data.continuationToken!;
+      return next;
+    });
+  }, [data?.continuationToken, pageIndex]);
+
+  const resetPagination = () => {
+    setPageIndex(0);
+    setPageTokens([undefined]);
+  };
+
+  const hasNextPage = Boolean(data?.continuationToken);
+  const hasPrevPage = pageIndex > 0;
+  const goToNextPage = () => {
+    if (hasNextPage) setPageIndex((p) => p + 1);
+  };
+  const goToPrevPage = () => {
+    if (hasPrevPage) setPageIndex((p) => p - 1);
+  };
+  const [triggerUpload] = useUploadFilesMutation();
+  const [triggerDelete, { isLoading: isDeleting }] = useDeleteFilesMutation();
+
+  const activeUploadsCount = uploadQueue.filter((item) => item.status === 'uploading').length;
+  const isUploading = activeUploadsCount > 0;
+
+  const files = data?.files ?? [];
+  const allSelected = files.length > 0 && files.every((f) => selectedKeys.has(f.key));
+
+  const updateItem = (id: string, patch: Partial<UploadItem>) => {
+    setUploadQueue((prev) => prev.map((item) => (item.id === id ? { ...item, ...patch } : item)));
+  };
+  const handleOpenFile = (file: { url?: string }) => {
+    console.log(file);
+    if (!file.url) return;
+    window.open(file.url, '_blank', 'noopener,noreferrer');
+  };
+
+  const toggleSelected = (key: string) => {
+    setSelectedKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    setSelectedKeys(() => {
+      if (allSelected) return new Set();
+      return new Set(files.map((f) => f.key));
+    });
+  };
+
+  const clearSelection = () => setSelectedKeys(new Set());
+
+  const requestDelete = (keys: string[]) => {
+    setDeleteError(null);
+    setKeysPendingDelete(keys);
+  };
+
+  const confirmDelete = async () => {
+    if (!keysPendingDelete) return;
+    try {
+      await triggerDelete(keysPendingDelete).unwrap();
+      setSelectedKeys((prev) => {
+        const next = new Set(prev);
+        keysPendingDelete.forEach((k) => next.delete(k));
+        return next;
+      });
+      setKeysPendingDelete(null);
+      resetPagination();
+    } catch (err) {
+      setDeleteError(getErrorMessage(err));
+    }
+  };
+
+  // Picking files now just opens the review dialog — nothing uploads yet.
+  const handleFilesSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const fileList = e.target.files;
+    if (!fileList || fileList.length === 0) {
+      e.target.value = '';
+      return;
+    }
+    const selected = Array.from(fileList); // snapshot before clearing — input.files is live
+    e.target.value = '';
+    setPendingFiles(selected);
+    setIsConfirmDialogOpen(true);
+  };
+
+  const removePendingFile = (index: number) => {
+    setPendingFiles((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const cancelSelection = () => {
+    setPendingFiles([]);
+    setIsConfirmDialogOpen(false);
+  };
+
+  const uploadFileList = async (selected: File[]) => {
+    if (!selected.length) return;
+
+    const items: UploadItem[] = selected.map((file, index) => {
+      const oversized = file.size > MAX_FILE_SIZE;
+      return {
+        id: `${Date.now()}-${index}-${file.name}`,
+        name: file.name,
+        size: file.size,
+        file,
+        status: oversized ? 'error' : 'uploading',
+        errorMessage: oversized ? `Exceeds ${formatBytes(MAX_FILE_SIZE)} limit` : undefined,
+      };
+    });
+
+    setUploadQueue((prev) => [...prev, ...items]);
+    setIsUploadPanelOpen(true);
+
+    const toUpload = items.filter((item) => item.status === 'uploading');
+    let cursor = 0;
+    const worker = async (): Promise<void> => {
+      const index = cursor++;
+      if (index >= toUpload.length) return;
+      await runUpload(toUpload[index]);
+      return worker();
+    };
+    await Promise.all(Array.from({ length: Math.min(MAX_CONCURRENT_UPLOADS, toUpload.length) }, worker));
+    resetPagination();
+  };
+
+  const confirmUpload = async () => {
+    const filesToUpload = pendingFiles;
+    setPendingFiles([]);
+    setIsConfirmDialogOpen(false);
+    await uploadFileList(filesToUpload);
+  };
+
+  const runUpload = async (item: UploadItem) => {
+    updateItem(item.id, { status: 'uploading', errorMessage: undefined });
+    try {
+      await triggerUpload({ files: [item.file], prefix: '' }).unwrap();
+      updateItem(item.id, { status: 'success' });
+    } catch (err) {
+      console.error(`Failed to upload ${item.name}:`, err);
+      updateItem(item.id, { status: 'error', errorMessage: getErrorMessage(err) });
+    }
+  };
+
+  const clearCompleted = () => {
+    setUploadQueue((prev) => prev.filter((item) => item.status === 'uploading'));
+  };
+
+  return (
+    <div className="app-shell">
+      {isConfirmDialogOpen && (
+        <ConfirmDialog
+          title={`${pendingFiles.length} file${pendingFiles.length !== 1 ? 's' : ''} selected`}
+          subtitle={`Total: ${formatBytes(pendingFiles.reduce((sum, f) => sum + f.size, 0))}`}
+          confirmLabel="Upload"
+          confirmIcon={<Upload size={14} />}
+          confirmDisabled={pendingFiles.length === 0}
+          onCancel={cancelSelection}
+          onConfirm={confirmUpload}
+        >
+          <div className="file-review-list">
+            {pendingFiles.length === 0 && (
+              <div className="empty-state empty-state--compact">No files left to upload.</div>
+            )}
+            {pendingFiles.map((file, index) => {
+              const oversized = file.size > MAX_FILE_SIZE;
+              const { Icon, className } = getFileVisual(file.name);
+              return (
+                <div key={`${file.name}-${index}`} className="file-review-row">
+                  <Icon size={18} className={oversized ? 'file-icon--error' : className} />
+                  <div className="file-review-row__text">
+                    <div className="file-review-row__name truncate" title={file.name}>
+                      {file.name}
+                    </div>
+                    <div className={`file-review-row__meta ${oversized ? 'file-review-row__meta--error' : ''}`}>
+                      {oversized ? `Too large — exceeds ${formatBytes(MAX_FILE_SIZE)}` : formatBytes(file.size)}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    className="icon-button icon-button--sm"
+                    aria-label={`Remove ${file.name}`}
+                    onClick={() => removePendingFile(index)}
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </ConfirmDialog>
+      )}
+
+      {keysPendingDelete && (
+        <ConfirmDialog
+          title={`Delete ${keysPendingDelete.length} item${keysPendingDelete.length !== 1 ? 's' : ''}?`}
+          subtitle="This can't be undone."
+          confirmLabel={isDeleting ? 'Deleting…' : 'Delete'}
+          confirmTone="danger"
+          confirmDisabled={isDeleting}
+          confirmIcon={isDeleting ? <Loader2 size={14} className="spinner-icon" /> : <Trash2 size={14} />}
+          onCancel={() => setKeysPendingDelete(null)}
+          onConfirm={confirmDelete}
+        >
+          <div className="file-review-list">
+            {keysPendingDelete.map((key) => {
+              const name = files.find((f) => f.key === key)?.name ?? key;
+              const { Icon, className } = getFileVisual(name);
+              return (
+                <div key={key} className="file-review-row">
+                  <Icon size={18} className={className} />
+                  <div className="file-review-row__text">
+                    <div className="file-review-row__name truncate" title={name}>
+                      {name}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+            {deleteError && (
+              <div className="inline-error">
+                <AlertCircle size={14} />
+                {deleteError}
+              </div>
+            )}
+          </div>
+        </ConfirmDialog>
+      )}
+
+      <div className="storage-main">
+        <div className="storage-top-bar">
+          <div className="storage-top-bar__search_bar">
+            <div className="search-icon-group">
+              <Search size={20} strokeWidth={2} />
+              <Sparkles size={10} strokeWidth={2.5} className="sparkle-icon" />
+            </div>
+            <input className="search-input" type="text" placeholder="Get answers from files" />
+          </div>
+          <div className="storage-top-bar__actions"></div>
+          <div className="action-icons">
+            <div className="upload-menu" ref={uploadMenuRef}>
+              <button
+                type="button"
+                className="upload-btn"
+                disabled={isUploading}
+                onClick={() => setIsUploadMenuOpen((v) => !v)}
+              >
+                <Upload size={16} strokeWidth={2.25} />
+                <span>{isUploading ? 'Uploading…' : 'Upload'}</span>
+                <ChevronDown
+                  size={14}
+                  strokeWidth={2.25}
+                  className={`upload-btn__chevron ${isUploadMenuOpen ? 'upload-btn__chevron--open' : ''}`}
+                />
+              </button>
+
+              {isUploadMenuOpen && (
+                <div className="upload-menu__dropdown">
+                  <button
+                    type="button"
+                    className="upload-menu__item"
+                    onClick={() => {
+                      fileInputRef.current?.click();
+                      setIsUploadMenuOpen(false);
+                    }}
+                  >
+                    <FileIcon size={16} strokeWidth={2} />
+                    <div className="upload-menu__item-text">
+                      <span>Upload files</span>
+                      <small>Select one or more files</small>
+                    </div>
+                  </button>
+                  <button
+                    type="button"
+                    className="upload-menu__item"
+                    onClick={() => {
+                      folderInputRef.current?.click();
+                      setIsUploadMenuOpen(false);
+                    }}
+                  >
+                    <FolderUp size={16} strokeWidth={2} />
+                    <div className="upload-menu__item-text">
+                      <span>Upload folder</span>
+                      <small>Keeps the folder structure</small>
+                    </div>
+                  </button>
+                </div>
+              )}
+
+              <input ref={fileInputRef} type="file" multiple style={{ display: 'none' }} onChange={handleFilesSelected} />
+              <input
+                ref={folderInputRef}
+                type="file"
+                // @ts-ignore
+                webkitdirectory="true"
+                directory="true"
+                multiple
+                style={{ display: 'none' }}
+                onChange={handleFilesSelected}
+              />
+            </div>
+
+            <div className="action-icons__divider" />
+
+            <button type="button" className="icon-button" aria-label="Advanced Search">
+              <Settings2 size={20} />
+            </button>
+            <button type="button" className="icon-button" aria-label="Filter Results">
+              <SlidersHorizontal size={20} />
+            </button>
+          </div>
+        </div>
+
+        <div className="storage-heading">Welcome to Drive</div>
+
+        <div className="storage-file-list-container">
+          {/* Selection toolbar replaces the header row while something is selected */}
+          {selectedKeys.size > 0 ? (
+            <div className="selection-bar">
+              <button type="button" className="selection-bar__checkbox" onClick={toggleSelectAll} aria-label="Deselect all">
+                <span className="checkbox checkbox--checked">
+                  <Check size={12} strokeWidth={3} />
+                </span>
+              </button>
+              <span className="selection-bar__count">{selectedKeys.size} selected</span>
+              <div className="selection-bar__spacer" />
+              <button
+                type="button"
+                className="btn btn--danger btn--sm"
+                onClick={() => requestDelete(Array.from(selectedKeys))}
+              >
+                <Trash2 size={14} />
+                Delete
+              </button>
+              <button type="button" className="btn btn--ghost btn--sm" onClick={clearSelection}>
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <div className="file-row list-header">
+              <div className="cell checkbox-cell">
+                <button
+                  type="button"
+                  className="selection-bar__checkbox"
+                  onClick={toggleSelectAll}
+                  aria-label="Select all"
+                  disabled={files.length === 0}
+                >
+                  <span className="checkbox" />
+                </button>
+              </div>
+              <div className="cell">Name</div>
+              <div className="cell">Changed Date</div>
+              <div className="cell">Owner</div>
+              <div className="cell">Location</div>
+              <div className="cell action-cell"></div>
+            </div>
+          )}
+
+          <div className="storage-file-list-body">
+            {isLoading && (
+              <div className="skeleton-list">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <div key={i} className="file-row skeleton-row">
+                    <div className="cell checkbox-cell">
+                      <div className="skeleton skeleton--checkbox" />
+                    </div>
+                    <div className="cell">
+                      <div className="skeleton skeleton--icon" />
+                      <div className="skeleton skeleton--text" style={{ width: '55%' }} />
+                    </div>
+                    <div className="cell">
+                      <div className="skeleton skeleton--text" style={{ width: '70%' }} />
+                    </div>
+                    <div className="cell">
+                      <div className="skeleton skeleton--text" style={{ width: '40%' }} />
+                    </div>
+                    <div className="cell">
+                      <div className="skeleton skeleton--text" style={{ width: '50%' }} />
+                    </div>
+                    <div className="cell action-cell" />
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {error && (
+              <div className="empty-state">
+                <AlertCircle size={28} />
+                <div className="empty-state__title">Couldn't load files</div>
+                <div className="empty-state__subtitle">Try refreshing the page.</div>
+              </div>
+            )}
+
+            {!isLoading && !error && files.length === 0 && (
+              <div className="empty-state">
+                <FolderUp size={28} />
+                <div className="empty-state__title">No files yet</div>
+                <div className="empty-state__subtitle">Upload a file to get started.</div>
+              </div>
+            )}
+
+            {!isLoading &&
+              files.map((file) => {
+                const { Icon, className } = getFileVisual(file.name);
+                const isSelected = selectedKeys.has(file.key);
+                return (
+                  <div
+                    key={file.key}
+                    className={`file-row list-item ${isSelected ? 'list-item--selected' : ''} ${!file.url ? 'list-item--no-link' : ''}`}
+                  >
+                    <div className="cell checkbox-cell">
+                      <button
+                        type="button"
+                        className="selection-bar__checkbox"
+                        onClick={() => toggleSelected(file.key)}
+                        aria-label={`Select ${file.name}`}
+                      >
+                        <span className={`checkbox ${isSelected ? 'checkbox--checked' : ''}`}>
+                          {isSelected && <Check size={12} strokeWidth={3} />}
+                        </span>
+                      </button>
+                    </div>
+                    <div className="cell name-cell" onClick={() => handleOpenFile(file)}>
+                      <Icon size={18} className={className} />
+                      <span className="truncate">{file.name}</span>
+                    </div>
+                    <div className="cell">
+                      <span className="truncate text-secondary">{file.lastModified ?? '—'}</span>
+                    </div>
+                    <div className="cell owner-cell">
+                      <div className="avatar">A</div>
+                      <span className="text-secondary">me</span>
+                    </div>
+                    <div className="cell location-cell">
+                      <span className="text-secondary truncate">My Drive</span>
+                    </div>
+                    <div className="cell action-cell">
+                      <button
+                        type="button"
+                        className="icon-button icon-button--sm row-delete-btn"
+                        aria-label={`Delete ${file.name}`}
+                        onClick={() => requestDelete([file.key])}
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+          </div>
+
+          {!isLoading && !error && (files.length > 0 || hasPrevPage) && (
+            <div className="storage-pagination">
+              <span className="storage-pagination__info">
+                Page {pageIndex + 1}
+                {isFetching && <Loader2 size={13} className="spinner-icon storage-pagination__spinner" />}
+              </span>
+              <div className="storage-pagination__controls">
+                <button
+                  type="button"
+                  className="btn btn--ghost btn--sm"
+                  onClick={goToPrevPage}
+                  disabled={!hasPrevPage || isFetching}
+                >
+                  Previous
+                </button>
+                <button
+                  type="button"
+                  className="btn btn--ghost btn--sm"
+                  onClick={goToNextPage}
+                  disabled={!hasNextPage || isFetching}
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {isUploadPanelOpen && uploadQueue.length > 0 && (
+          <div className="upload-manager">
+            <div className="upload-manager__header">
+              <h3>
+                {activeUploadsCount > 0
+                  ? `Uploading ${activeUploadsCount} item${activeUploadsCount > 1 ? 's' : ''}`
+                  : 'Uploads complete'}
+              </h3>
+              <div style={{ display: 'flex', gap: 8 }}>
+                {activeUploadsCount === 0 && (
+                  <button className="upload-manager__clear" onClick={clearCompleted}>
+                    Clear
+                  </button>
+                )}
+                <button className="upload-manager__close" onClick={() => setIsUploadPanelOpen(false)}>
+                  <X size={16} />
+                </button>
+              </div>
+            </div>
+            <div className="upload-manager__body">
+              {uploadQueue.map((item) => {
+                const { Icon, className } = getFileVisual(item.name);
+                return (
+                  <div key={item.id} className="upload-manager__item">
+                    <Icon size={18} className={className} />
+                    <div className="upload-manager__item-text">
+                      <span className="upload-manager__item-name truncate">{item.name}</span>
+                      <small className="upload-manager__item-meta">
+                        {item.status === 'error' ? item.errorMessage : formatBytes(item.size)}
+                      </small>
+                    </div>
+
+                    <div className="upload-manager__item-status">
+                      {item.status === 'uploading' && <Loader2 size={16} className="spinner-icon text-blue-500" />}
+                      {item.status === 'success' && <CheckCircle2 size={18} className="text-green-500" />}
+                      {item.status === 'error' && (
+                        <>
+                          <AlertCircle size={18} className="text-red-500" />
+                          <button
+                            className="upload-manager__retry"
+                            aria-label={`Retry ${item.name}`}
+                            onClick={() => runUpload(item)}
+                          >
+                            <RotateCcw size={14} />
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {!isChatOpen && (
+          <button type="button" className="ai-icon" aria-label="Open AI assistant" onClick={() => setIsChatOpen(true)}>
+            <GlowingAiSparkle />
+          </button>
+        )}
+      </div>
+
+      <aside className={`chat-side-panel ${isChatOpen ? 'chat-side-panel--open' : ''}`}>
+        <div className="chat-side-panel__inner">
+          <button type="button" className="chat-side-panel__close" aria-label="Close AI assistant" onClick={() => setIsChatOpen(false)}>
+            <X size={18} />
+          </button>
+          <div className="chat-side-panel__body">
+            {isChatOpen && (
+              <ChatPage
+                windowId={STORAGE_CHAT_WINDOW_ID}
+                showTopBar={false}
+                welcomeMessage="Ask me anything about your files"
+                className="chat_plane--embedded"
+              />
+            )}
+          </div>
+        </div>
+      </aside>
+    </div>
+  );
+}

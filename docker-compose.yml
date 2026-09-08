@@ -1,0 +1,24 @@
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        # baked into the JS bundle at build time — this is what the
+        # BROWSER calls, so it stays a same-origin relative path; nginx
+        # (see nginx.conf) proxies it to the "app" service by name
+        - VITE_API_URL=${VITE_API_URL}
+        - VITE_FIREBASECONFIG_API=${VITE_FIREBASECONFIG_API}
+    container_name: owlbot-frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    networks:
+      - owlbot-net
+
+networks:
+  owlbot-net:
+    # this must already exist — it's created by `docker compose up` in the
+    # owlbot folder (see the `networks.default.name` there). Start owlbot's
+    # stack FIRST, then this one, or this network won't exist yet.
+    external: true

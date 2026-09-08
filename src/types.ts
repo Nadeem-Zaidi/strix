@@ -131,7 +131,8 @@ export type ImageUrlContent = {
 
 export type ImageId = {
     type: string,
-    file_id: string
+    file_id: string,
+    image_url?: string
 
 }
 
@@ -139,7 +140,8 @@ export type FileInput = {
     type: string,
     file_id: string,
     fileName?: string,
-    fileExtension?: string
+    fileExtension?: string,
+    fileUrl?: string
 }
 
 export type Tool = {
@@ -191,6 +193,7 @@ export type LLMMessage = {
     isDone?:boolean
     error?:string
     cancelled?:boolean
+    source_file?:string[]
 }
 
 export type ImageAttachment= {
@@ -216,6 +219,7 @@ export type LLMFileUploadResponse={
     name:string,
     extension:string,
     isImage:boolean,
-    fileId:string
+    fileId:string,
+    url:string
 
 }
