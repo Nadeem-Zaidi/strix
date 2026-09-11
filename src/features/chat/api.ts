@@ -12,6 +12,11 @@ export type StreamChunk = {
         | "mcp_call_output"         // remote MCP tool call completed
         | "mcp_list_tools"          // MCP server exposed its available tools
         | "mcp_approval_request"    // MCP server requires human approval before running
+        | "code_interpreter_call"            // hosted code interpreter call started
+        | "code_interpreter_call_code_delta" // streamed chunk of the code being written
+        | "code_interpreter_call_code_done"  // full code for this call, finalized
+        | "code_interpreter_call_status"     // status update: "in_progress" | "interpreting" | "completed" | "failed"
+        | "code_interpreter_file"            // a file (chart, csv, etc.) the code interpreter generated
         | "session_title"
         | "error"
         | "cancelled"               // stream aborted via AbortController
@@ -28,6 +33,11 @@ export type StreamChunk = {
     isDone?: boolean;
     server_label?: string;      // which MCP server this event relates to (mcp_call, mcp_call_arguments, mcp_list_tools, mcp_approval_request)
     tools?: { name: string; description?: string }[]; // tool list from mcp_list_tools
+    delta?: string;             // code_interpreter_call_code_delta
+    status?: string;            // code_interpreter_call_status
+    file_id?: string;           // code_interpreter_file
+    container_id?: string;      // code_interpreter_file
+    filename?: string;          // code_interpreter_file
 };
 
 class Api extends BaseApi {
@@ -67,7 +77,7 @@ class Api extends BaseApi {
         try {
             await this.stream(
                 "/chat_stream",
-                { currentSessionId: sessionId, llmMessage: message }, // field names matched to backend body destructuring
+                { currentSessionId: sessionId, llmMessage: message },
                 (_event, data) => onChunk(data as StreamChunk),
                 this.abortController.signal
             );
@@ -102,8 +112,6 @@ class Api extends BaseApi {
 
     async uploadFile(file: File): Promise<LLMFileUploadResponse> {
         const headers = await this.getHeader();
-        // Do NOT send Content-Type: application/json here — the browser needs
-        // to set its own multipart/form-data boundary for FormData bodies.
         const authHeaders: Record<string, string> = { Authorization: headers.Authorization };
 
         const formData = new FormData();
@@ -130,7 +138,10 @@ class Api extends BaseApi {
             uploaded: number;
             failed: number;
             results: (
-                | { name: string; status: "uploaded"; url: string }
+                // openaiFileId is present only when this was a csv/xls/xlsx and
+                // the backend successfully mirrored it to OpenAI's Files API —
+                // see storage_routes.ts's uploadAndIndex().
+                | { name: string; status: "uploaded"; url: string; openaiFileId?: string }
                 | { name: string; status: "failed"; error: string }
             )[];
         };
@@ -152,7 +163,44 @@ class Api extends BaseApi {
             // as fileId here.
             fileId: result.url,
             url: result.url,
+            openaiFileId: result.openaiFileId,
         };
+    }
+
+    // Fetches a file the code interpreter generated inside its container.
+    // This has to go through our backend (see /code_interpreter/files/:containerId/:fileId)
+    // rather than hitting OpenAI directly, since that requires the API key.
+    // Returned as a Blob (not a plain URL) because the endpoint sits behind
+    // the same Firebase auth as everything else, so a bare <img src="..."> or
+    // <a href="..."> can't carry the Authorization header it needs.
+    async getCodeInterpreterFile(
+        containerId: string,
+        fileId: string,
+        filenameHint?: string
+    ): Promise<{ blob: Blob; filename: string; contentType: string }> {
+        const headers = await this.getHeader();
+        const authHeaders: Record<string, string> = { Authorization: headers.Authorization };
+
+        const response = await fetch(`${this.baseUrl}/code_interpreter/files/${containerId}/${fileId}`, {
+            headers: authHeaders,
+        });
+
+        if (!response.ok) {
+            let message = "Failed to fetch file";
+            try {
+                const error = await response.json();
+                message = error.message ?? message;
+            } catch {
+                message = await response.text();
+            }
+            throw new Error(message);
+        }
+
+        const contentType = response.headers.get("Content-Type") ?? "application/octet-stream";
+        const headerName = response.headers.get("X-File-Name");
+        const filename = (headerName ? decodeURIComponent(headerName) : undefined) ?? filenameHint ?? fileId;
+        const blob = await response.blob();
+        return { blob, filename, contentType };
     }
 
     protected async stream(

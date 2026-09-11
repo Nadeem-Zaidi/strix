@@ -23,6 +23,16 @@ export interface ListFilesResponse {
     continuationToken?: string | null;
 }
 
+export interface ListFilesArgs {
+    continuationToken?: string;
+    // When set, the backend switches /list_files into search mode: it walks
+    // every page under the user's prefix server-side (S3 has no substring
+    // search — see storage_routes.ts) and returns matches directly, with no
+    // continuationToken, since a search result set isn't meant to be paged
+    // through the same way a plain listing is.
+    search?: string;
+}
+
 export interface UploadFilesResponse {
     uploaded: number;
 }
@@ -35,7 +45,7 @@ export interface DeleteFilesResponse {
 export const storageApi = createApi({
     reducerPath: "storageApi",
     baseQuery: fetchBaseQuery({
-        baseUrl: "/", // same-origin — nginx proxies /list_files, /upload, /delete to the app container
+        baseUrl: "http://localhost:3000",
         prepareHeaders: async ( headers) => {
             const user = await waitForAuthUser();
             if (user) {
@@ -47,11 +57,20 @@ export const storageApi = createApi({
     }),
     tagTypes: ["File"],
     endpoints: (builder) => ({
-        listFiles: builder.query<ListFilesResponse, string | undefined>({
-            query: (continuationToken) => ({
-                url: "/list_files",
-                params: continuationToken ? { continuationToken } : undefined,
-            }),
+        listFiles: builder.query<ListFilesResponse, ListFilesArgs | undefined>({
+            query: (args) => {
+                const params: Record<string, string> = {};
+                if (args?.continuationToken) params.continuationToken = args.continuationToken;
+                if (args?.search) params.search = args.search;
+                return {
+                    url: "/list_files",
+                    params: Object.keys(params).length ? params : undefined,
+                };
+            },
+            // RTK Query caches each distinct arg shape separately, so a search
+            // query and the plain listing don't clobber each other's cache —
+            // switching the search box back to empty falls right back to the
+            // already-cached first page instead of refetching.
             providesTags: (result) =>
                 result?.files
                     ? [

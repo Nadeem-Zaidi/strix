@@ -403,6 +403,82 @@
 }
 
 /* ═══════════════════════════════════════════════════
+   MOBILE SIDEBAR DRAWER
+   Desktop docks a 256px sidebar beside the chat pane and just narrows it
+   to a 52px icon rail when "collapsed" — on a phone that rail (or worse,
+   the full 256px) permanently ate a third or more of the screen with no
+   way to get it out of the way. Below the breakpoint it becomes an
+   off-canvas drawer instead: hidden by default, slid in over the chat
+   (not squeezed beside it) via the persistent hamburger button that
+   sidebar.tsx now renders outside the drawer itself.
+   ═══════════════════════════════════════════════════ */
+.mobile_sidebar_toggle {
+    display: none;
+}
+
+.sidebar_backdrop {
+    display: none;
+}
+
+@media (max-width: 860px) {
+    .mobile_sidebar_toggle {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        position: fixed;
+        top: 14px;
+        left: 14px;
+        width: 38px;
+        height: 38px;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-md);
+        background: var(--bg-surface);
+        color: var(--text-pri);
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        z-index: 80;
+        cursor: pointer;
+        font-size: 14px;
+    }
+
+    .sidebar_backdrop {
+        display: block;
+        position: fixed;
+        inset: 0;
+        background: rgba(15, 15, 20, 0.4);
+        z-index: 60;
+        animation: sidebarBackdropIn var(--speed) ease;
+    }
+
+    .sidebar,
+    .sidebar.collapsed {
+        position: fixed;
+        top: 0;
+        left: 0;
+        height: 100dvh;
+        width: min(82vw, 300px);
+        z-index: 70;
+        transform: translateX(-100%);
+        box-shadow: 4px 0 24px rgba(0, 0, 0, 0.18);
+        transition: transform var(--speed) cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .sidebar.mobile_open,
+    .sidebar.collapsed.mobile_open {
+        transform: translateX(0);
+    }
+}
+
+@keyframes sidebarBackdropIn {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+/* ═══════════════════════════════════════════════════
    CHAT PLANE
    ═══════════════════════════════════════════════════ */
 .chat_plane {
@@ -429,6 +505,27 @@
     color: var(--text-pri);
     font-family: var(--font-brand);
     letter-spacing: -0.01em;
+}
+
+/* Brand mark — replaces the plain "Owl Bot" text label with a minimal,
+   single-color owl glyph (see OwlMark in owl_icon.tsx). Static — no pulse
+   or breathing animation, unlike the "thinking" version of the same icon —
+   this one just needs to read as a clean logo. */
+.chat_topbar__brand {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-pri);
+}
+
+.owl-mark__line {
+    stroke: currentColor;
+    fill: none;
+    stroke-linejoin: round;
+}
+
+.owl-mark__pupil {
+    fill: currentColor;
 }
 
 .topbar_status_dot {
@@ -574,6 +671,23 @@
     white-space: nowrap;
 }
 
+/* Wraps one assistant reply's parts (text, code-interpreter cards, sources) —
+   previously an unstyled div, so consecutive parts (e.g. a chart card
+   followed by explanatory text) sat flush with zero gap between them. */
+.assistant_turn {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    width: 100%;
+    align-items: flex-start;
+}
+
+.bot_message_hr {
+    border: none;
+    border-top: 1px solid var(--border-soft);
+    margin: 16px 0;
+}
+
 /* Bot response — full-width prose */
 .bot_message {
     align-self: flex-start;
@@ -686,60 +800,130 @@
     padding: 6px 0;
 }
 
-.dot-trio {
-    display: flex;
-    gap: 4px;
+/* ═══════════════════════════════════════════════════
+   THINKING OWL
+   Replaces the old three-dot spinner + "Thinking…" text with a small
+   animated owl mark, in keeping with the app's own branding ("Strix" in
+   the sidebar). Drawn as a single-color line icon — no filled cartoon
+   colors — so it reads as a standard status glyph; a pulsing ring plus a
+   breathing scale on the icon itself is what actually reads as "working"
+   (the earlier version only bobbed 3px and blinked once every few
+   seconds, which was too subtle to register as an active indicator).
+   ═══════════════════════════════════════════════════ */
+.thinking-owl {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    color: var(--accent);
 }
 
-.dot-trio span {
-    width: 5px;
-    height: 5px;
+.thinking-owl__pulse {
+    position: absolute;
+    inset: 0;
     border-radius: 50%;
-    background: var(--accent);
-    opacity: 0.5;
-    animation: dot-bob 1.3s ease-in-out infinite;
+    border: 1.5px solid var(--accent);
+    animation: owlPulseRing 1.8s ease-out infinite;
 }
 
-.dot-trio span:nth-child(2) {
-    animation-delay: 0.18s;
+.thinking-owl__svg {
+    position: relative;
+    z-index: 1;
+    transform-origin: center;
+    animation: owlBreathe 1.8s ease-in-out infinite;
 }
 
-.dot-trio span:nth-child(3) {
-    animation-delay: 0.36s;
+.thinking-owl__line {
+    stroke: currentColor;
+    fill: none;
+    stroke-linejoin: round;
 }
 
-@keyframes dot-bob {
+.thinking-owl__pupil {
+    fill: currentColor;
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: owlBlink 3.6s ease-in-out infinite;
+}
 
-    0%,
-    80%,
-    100% {
-        transform: translateY(0);
-        opacity: 0.35;
+@keyframes owlPulseRing {
+    0% {
+        transform: scale(0.75);
+        opacity: 0.55;
     }
 
-    40% {
-        transform: translateY(-5px);
-        opacity: 1;
+    70% {
+        opacity: 0;
+    }
+
+    100% {
+        transform: scale(1.4);
+        opacity: 0;
+    }
+}
+
+@keyframes owlBreathe {
+
+    0%,
+    100% {
+        transform: scale(1);
+    }
+
+    50% {
+        transform: scale(1.12);
+    }
+}
+
+@keyframes owlBlink {
+
+    0%,
+    92%,
+    100% {
+        transform: scaleY(1);
+    }
+
+    96% {
+        transform: scaleY(0.15);
     }
 }
 
 /* ═══════════════════════════════════════════════════
    TOOL CARDS
+   Collapsed by default (see tool_call_card.tsx) — the raw args/result JSON
+   used to be dumped inline, always visible, with no way to hide it. Now
+   only the compact header (name, status) shows unless someone opens it.
    ═══════════════════════════════════════════════════ */
 .tool-card {
-    display: flex;
-    align-items: flex-start;
-    gap: 10px;
     background: var(--bg-input);
     border: 1px solid var(--border-soft);
     border-radius: var(--radius-md);
-    padding: 10px 13px;
-    max-width: 360px;
+    max-width: 420px;
     transition: border-color 0.15s;
+    overflow: hidden;
 }
 
 .tool-card.done {
     border-color: #bfeed8;
+}
+
+.tool-card__header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 10px 13px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    text-align: left;
+    font: inherit;
+    color: inherit;
+}
+
+.tool-card__header:disabled {
+    cursor: default;
 }
 
 .tool-icon-wrap {
@@ -751,11 +935,48 @@
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
-    position: relative;
+    font-size: 13px;
+    color: var(--tool-purple-fg);
 }
 
 .tool-icon-wrap.done {
     background: var(--tool-green-bg);
+    color: var(--tool-green-fg);
+}
+
+.tool-card__text {
+    flex: 1;
+    min-width: 0;
+}
+
+.tool-card__title {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12.5px;
+    font-weight: 500;
+    color: var(--text-pri);
+}
+
+.tool-card__name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.tool-card__status {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11px;
+    color: var(--text-sec);
+    margin-top: 1px;
+}
+
+.tool-card__chevron {
+    flex-shrink: 0;
+    color: var(--text-ter);
+    font-size: 11px;
 }
 
 .tool-status-dot {
@@ -764,9 +985,10 @@
     border-radius: 50%;
     background: var(--tool-purple-fg);
     animation: pulse 1.4s ease-in-out infinite;
+    flex-shrink: 0;
 }
 
-.tool-card.done .tool-status-dot {
+.tool-status-dot.done {
     background: var(--tool-green-fg);
     animation: none;
 }
@@ -783,12 +1005,42 @@
     }
 }
 
-.tool-args {
+.mcp-badge {
+    font-size: 9.5px;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    color: #1d6fe0;
+    background: #e7f0fd;
+    border-radius: 5px;
+    padding: 1.5px 6px;
+    flex-shrink: 0;
+}
+
+.tool-card__body {
+    border-top: 1px solid var(--border-soft);
+    padding: 10px 13px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.tool-card__block {
     font-family: var(--font-mono);
-    font-size: 10.5px;
+    font-size: 11px;
+    line-height: 1.5;
+    color: var(--text-pri);
+    background: var(--bg-code);
+    border: 1px solid var(--border-soft);
+    border-radius: var(--radius-sm);
+    padding: 8px 10px;
+    max-height: 220px;
+    overflow: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.tool-card__block--result {
     color: var(--text-sec);
-    margin-top: 3px;
-    word-break: break-all;
 }
 
 .mcp_status {
@@ -1356,21 +1608,26 @@ button:focus-visible,
   gap: 6px;
   flex-wrap: wrap;
   max-width: 100%;
-  margin-top: 6px;
-  font-size: 11px;
-  color: var(--text-secondary);
+  margin-top: 2px;
+  font-size: 11.5px;
+  color: var(--text-sec);
 }
 .sources_label {
-  font-weight: 500;
+  font-weight: 600;
   flex-shrink: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 10.5px;
 }
 .source_pill {
-  background: var(--bg-secondary, #f0f0f0);
+  background: var(--accent-soft);
+  color: var(--text-pri);
   border-radius: 10px;
-  padding: 2px 8px;
+  padding: 3px 9px;
   max-width: 100%;
   overflow-wrap: anywhere;
   white-space: normal;
+  font-weight: 500;
 }
 
 
@@ -1539,4 +1796,305 @@ button:focus-visible,
   border-color: #C0392B;
   color: #fff;
   transform: scale(1.05);
+}
+
+/* ═══════════════════════════════════════════════════
+   CODE INTERPRETER CARD
+   ═══════════════════════════════════════════════════ */
+.code-interpreter-card {
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-input);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-md);
+  max-width: 480px;
+  overflow: hidden;
+  transition: border-color 0.15s;
+}
+
+.code-interpreter-card.done {
+  border-color: #bfeed8;
+}
+
+.code-interpreter-card.failed {
+  border-color: #f3c2c2;
+}
+
+.code-interpreter-card__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 13px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  color: var(--text-pri);
+}
+
+.code-interpreter-card__icon {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  background: var(--tool-purple-bg);
+  color: var(--tool-purple-fg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.code-interpreter-card.done .code-interpreter-card__icon {
+  background: var(--tool-green-bg);
+  color: var(--tool-green-fg);
+}
+
+.code-interpreter-card__title {
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.code-interpreter-card__status {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--text-sec);
+}
+
+.ci-status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--tool-purple-fg);
+}
+
+.ci-status-dot.running {
+  animation: pulse 1.4s ease-in-out infinite;
+}
+
+.ci-status-dot.done {
+  background: var(--tool-green-fg);
+}
+
+.ci-status-dot.failed {
+  background: #C0392B;
+}
+
+.code-interpreter-card__chevron {
+  font-size: 10px;
+  color: var(--text-ter);
+}
+
+.code-interpreter-card__code {
+  margin: 0;
+  padding: 10px 13px;
+  background: var(--bg-code);
+  border-top: 1px solid var(--border-soft);
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--text-pri);
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.code-interpreter-card__files {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px 13px;
+  border-top: 1px solid var(--border-soft);
+}
+
+.ci-file {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+  background: var(--bg-surface);
+  font-size: 11px;
+  color: var(--text-pri);
+}
+
+.ci-file--doc {
+  padding: 6px 10px;
+  cursor: pointer;
+  font: inherit;
+}
+
+.ci-file--doc:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+
+.ci-file__icon {
+  background: var(--tool-purple-bg);
+  color: var(--tool-purple-fg);
+  border-radius: 5px;
+  padding: 2px 5px;
+  font-size: 9.5px;
+  font-weight: 600;
+}
+
+.ci-file__action {
+  color: var(--text-sec);
+  margin-left: 4px;
+}
+
+.ci-file--image {
+  flex-direction: column;
+  align-items: stretch;
+  padding: 8px;
+  width: 100%;
+  max-width: 420px;
+}
+
+.ci-file__img {
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+  border-radius: 6px;
+  cursor: zoom-in;
+  display: block;
+  border: 1px solid var(--border-soft);
+}
+
+.ci-file__loading,
+.ci-file__error {
+  padding: 32px 8px;
+  text-align: center;
+  color: var(--text-sec);
+  font-size: 12px;
+}
+
+.ci-file__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 2px 0;
+}
+
+.ci-file__name {
+  font-size: 11px;
+  color: var(--text-sec);
+  word-break: break-all;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ci-file__download-btn {
+  flex-shrink: 0;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border: none;
+  border-radius: 6px;
+  padding: 5px 10px;
+  cursor: pointer;
+}
+
+/* ═══════════════════════════════════════════════════
+   TOUCH DEVICES
+   .pasted_content_remove only ever showed on :hover — fine with a mouse,
+   but a touch screen has no hover state, so the "×" to remove a pasted
+   text chip was effectively invisible and unreachable on mobile.
+   ═══════════════════════════════════════════════════ */
+@media (hover: none) {
+    .pasted_content_remove {
+        opacity: 1;
+    }
+}
+
+/* ═══════════════════════════════════════════════════
+   MOBILE LAYOUT
+   General spacing/sizing tune-up for phone widths — the desktop values
+   (24px gutters, 70%/86% bubble caps, a 22px welcome heading) were tuned
+   for a wide chat pane and either wasted space or crowded content once
+   the sidebar stopped taking up permanent width (see the drawer rules
+   above) and the pane itself became the whole viewport.
+   ═══════════════════════════════════════════════════ */
+@media (max-width: 860px) {
+    .chat_topbar {
+        padding: 14px 16px 14px 60px; /* left gutter clears the fixed hamburger button */
+    }
+
+    .message_area {
+        padding: 0 14px 60vh;
+        gap: 16px;
+    }
+
+    .user_message {
+        max-width: 88%;
+    }
+
+    .bot_message > p,
+    .bot_message > ul,
+    .bot_message > ol,
+    .bot_message > h1,
+    .bot_message > h2,
+    .bot_message > h3,
+    .bot_message > h4,
+    .bot_message > blockquote {
+        max-width: 100%;
+    }
+
+    .chat_input_wrapper {
+        padding: 8px 14px 16px;
+    }
+
+    .chat_welcom_message {
+        font-size: 18px;
+        margin-bottom: 16px;
+    }
+
+    .code-interpreter-card {
+        max-width: 100%;
+    }
+
+    .tool-card {
+        max-width: 100%;
+    }
+
+    .user_message_image {
+        max-width: 200px;
+        max-height: 200px;
+    }
+}
+
+@media (max-width: 480px) {
+    .message_area {
+        padding: 0 10px 60vh;
+    }
+
+    .chat_input_wrapper {
+        padding: 8px 10px 14px;
+    }
+
+    .chat_input {
+        padding: 10px 12px 8px;
+    }
+}
+
+.ci-file__download-btn:hover {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+.ci-file__download-btn:disabled {
+  cursor: default;
+  opacity: 0.7;
 }

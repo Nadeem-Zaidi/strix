@@ -141,7 +141,11 @@ export type FileInput = {
     file_id: string,
     fileName?: string,
     fileExtension?: string,
-    fileUrl?: string
+    fileUrl?: string,
+    // Set only for spreadsheet uploads (csv/xls/xlsx) — lets the backend's
+    // code interpreter container actually read the file instead of only
+    // having an S3 link, which the container can't open.
+    openaiFileId?: string
 }
 
 export type Tool = {
@@ -163,7 +167,26 @@ export type ImageBase64Content = {
     };
 };
 
-export type ContentPart = TextContent | ImageUrlContent | ImageBase64Content | ImageId | ToolCall;
+export type CodeInterpreterFileRef = {
+    file_id: string;
+    container_id: string;
+    filename?: string;
+    // When present, this is a persisted S3 copy the backend made the moment
+    // the file was generated — use it directly (no live fetch needed) since
+    // OpenAI's own container.file_id link dies ~20 min after the container
+    // goes idle. Absent on older messages saved before this existed, which
+    // still fall back to api.getCodeInterpreterFile()'s live proxy.
+    url?: string;
+};
+
+export type CodeInterpreterContent = {
+    type: string; // "code_interpreter"
+    code: string;
+    status: string;
+    files?: CodeInterpreterFileRef[];
+};
+
+export type ContentPart = TextContent | ImageUrlContent | ImageBase64Content | ImageId | FileInput | ToolCall | CodeInterpreterContent;
 
 export type LLMConfig = {
     model: string;
@@ -220,6 +243,9 @@ export type LLMFileUploadResponse={
     extension:string,
     isImage:boolean,
     fileId:string,
-    url:string
+    url:string,
+    // Present only when the upload was a csv/xls/xlsx and the backend
+    // successfully mirrored it to OpenAI's Files API for code interpreter.
+    openaiFileId?:string
 
 }

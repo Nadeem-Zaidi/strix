@@ -114,6 +114,27 @@
     color: var(--text-tertiary);
 }
 
+.search-input__clear {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 22px;
+    height: 22px;
+    margin-right: 6px;
+    border: none;
+    border-radius: 9999px;
+    background-color: var(--border);
+    color: var(--text-secondary, var(--text-tertiary));
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+}
+
+.search-input__clear:hover {
+    background-color: var(--accent-soft);
+    color: var(--accent);
+}
+
 .action-icons {
     display: flex;
     align-items: center;
@@ -1005,6 +1026,148 @@
     display: flex;
     align-items: center;
     padding: 2px;
+}
+
+/* ═══════════════════════════════════════
+   MOBILE RESPONSIVE
+   This page previously had zero @media rules — the top bar's 60%-width
+   search field plus icon buttons, the file grid's `min-width: 800px`,
+   the 420px-wide AI chat side panel, and the fixed-width upload
+   dropdown/manager all assumed desktop-class width and simply overflowed
+   or got clipped on a phone screen.
+   ═══════════════════════════════════════ */
+@media (max-width: 860px) {
+    .storage-main {
+        padding: 14px 14px 20px;
+    }
+
+    .storage-top-bar {
+        flex-wrap: wrap;
+        row-gap: 10px;
+    }
+
+    .storage-top-bar__search_bar {
+        order: 2;
+        width: 100%;
+    }
+
+    .action-icons {
+        order: 1;
+        margin-left: auto;
+    }
+
+    .upload-btn span {
+        display: none;
+    }
+
+    .upload-btn {
+        padding: 0 10px;
+        gap: 0;
+    }
+
+    .storage-heading {
+        margin-top: 14px;
+        margin-bottom: 10px;
+        font-size: 19px;
+    }
+
+    /* The grid used to force an 800px-wide card that just spilled off the
+       screen. Dropping the less essential columns (they're not clipped —
+       the JSX still renders them, they're just hidden) lets the remaining
+       checkbox/name/action columns fit a phone width without any
+       horizontal scrolling. */
+    .storage-file-list-container {
+        min-width: 0;
+        max-height: calc(100vh - 220px);
+    }
+
+    .file-row {
+        grid-template-columns: 32px 1fr 42px;
+    }
+
+    .date-cell,
+    .owner-cell,
+    .location-cell {
+        display: none;
+    }
+
+    .selection-bar__count {
+        font-size: 12.5px;
+    }
+
+    /* Was `position: absolute; right: 0` relative to the upload button's own
+       wrapper — fine on desktop, but once the top bar wraps/reflows on
+       mobile (the button can end up hugging either edge depending on how
+       much the row shrank) that relative math produces a dropdown that's
+       partly or mostly off-screen instead of sitting under the button.
+       Anchoring it to the viewport instead sidesteps that entirely: it
+       always lands as a clean sheet near the top, regardless of where the
+       trigger button ended up. */
+    .upload-menu__dropdown {
+        position: fixed;
+        top: 64px;
+        left: 12px;
+        right: 12px;
+        width: auto;
+    }
+
+    /* Was anchored `right: 100px` with a fixed 320px width — on a narrow
+       screen that math pushes it partly off the left edge. Pin it as a
+       full-width sheet near the bottom instead. */
+    .upload-manager {
+        left: 12px;
+        right: 12px;
+        bottom: 12px;
+        width: auto;
+        max-height: 60vh;
+    }
+
+    .ai-icon {
+        right: 16px;
+        bottom: 16px;
+        width: 50px;
+        height: 50px;
+    }
+
+    /* The AI chat panel was a docked 420px-wide flex column — next to a
+       ~375px viewport that leaves negative space for the file list.
+       Below this breakpoint it becomes a full-screen overlay instead. */
+    .chat-side-panel--open {
+        position: fixed;
+        inset: 0;
+        width: 100%;
+        z-index: 100;
+    }
+
+    .chat-side-panel__inner {
+        width: 100%;
+    }
+
+    .modal__header {
+        padding: 14px 16px;
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+
+    .modal__actions {
+        width: 100%;
+        justify-content: flex-end;
+    }
+}
+
+@media (max-width: 480px) {
+    .storage-heading {
+        font-size: 17px;
+    }
+
+    .icon-button {
+        width: 34px;
+        height: 34px;
+    }
+
+    .action-icons__divider {
+        display: none;
+    }
 }
 
 .upload-manager__retry:hover {

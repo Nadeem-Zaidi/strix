@@ -111,6 +111,36 @@ export const BotMessage = ({ text, isStreaming, cancelled }: BotMessageProps) =>
                         </a>
                     );
                 },
+                // Tables come back from the model as plain GFM markdown
+                // (remark-gfm parses the pipe syntax), but ReactMarkdown's
+                // default table/thead/tr/th/td elements carry no classes —
+                // they were rendering as bare, unstyled HTML tables even
+                // though chat.css already has a full "MARKDOWN TABLES"
+                // theme (.table_wrapper/.md_table/.md_thead/.md_th/.md_td)
+                // waiting to be used. Wiring these up is what actually
+                // makes generated tables look designed instead of raw.
+                table({ children }) {
+                    return (
+                        <div className="table_wrapper">
+                            <table className="md_table">{children}</table>
+                        </div>
+                    );
+                },
+                thead({ children }) {
+                    return <thead className="md_thead">{children}</thead>;
+                },
+                tr({ children }) {
+                    return <tr className="md_tr">{children}</tr>;
+                },
+                th({ children }) {
+                    return <th className="md_th">{children}</th>;
+                },
+                td({ children }) {
+                    return <td className="md_td">{children}</td>;
+                },
+                hr() {
+                    return <hr className="bot_message_hr" />;
+                },
             }}
         >
             {text}

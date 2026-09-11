@@ -3,6 +3,8 @@ import "./chat.css";
 import { useSelector } from "react-redux";
 import { useAppDispatch } from "../../store/store";
 import type {
+  CodeInterpreterContent,
+  CodeInterpreterFileRef,
   ContentPart,
   FileAttachment,
   FileInput,
@@ -18,6 +20,9 @@ import { api, type StreamChunk } from "./api";
 import { BotMessage } from "./bot_message";
 import { appendCacheMessage, clearCacheMessage, closeWindow, endSessionStream, loadMessages, loadSessions, newSession, openWindow, replaceLastMessage, setChatMode, startSessionStream } from "./session_slice_practice";
 import { FileComponent } from "./file_component";
+import { CodeInterpreterCard } from "./code_interpreter_card";
+import { ToolCallCard } from "./tool_call_card";
+import { ThinkingOwl, OwlMark } from "./owl_icon";
 
 
 export interface ChatPageProps {
@@ -33,8 +38,11 @@ type ToolInfo = {
   args: string;
   done: boolean;
   result?: string;
-  source: "function" | "mcp";
+  source: "function" | "mcp" | "code_interpreter";
   serverLabel?: string;
+  code?: string;                     // code_interpreter only — accumulated as it streams in
+  status?: string;                   // code_interpreter only — "in_progress" | "interpreting" | "completed" | "failed"
+  files?: CodeInterpreterFileRef[];  // code_interpreter only — generated files
 };
 const RAG_TOOL_NAME = "search_knowledge_base";
 function extractSourceFilenames(output: string | undefined): string[] {
@@ -217,11 +225,17 @@ export const ChatPage = ({
   }, [cacheMessages]);
 
   // ── helpers ────────────────────────────────────────────────────────────────
-  function updateBotMessage(sessionState: SessionStreamState, text: string) {
+  // extraParts carries code_interpreter content parts (see the isDone
+  // handling below) — without it, the code interpreter card only ever
+  // exists in the transient `activeTools` state and disappears the instant
+  // resetSessionStream() clears that state at the end of the turn, even
+  // though the card (and any generated image) rendered correctly moments
+  // earlier while the reply was still streaming.
+  function updateBotMessage(sessionState: SessionStreamState, text: string, extraParts: ContentPart[] = []) {
     const messagePayload = {
       type: "message",
       role: "assistant",
-      content: [{ type: "text", text }],
+      content: [{ type: "text", text }, ...extraParts],
       sources: sessionState.sources.length ? sessionState.sources : undefined,
     } as LLMMessage;
 
@@ -398,6 +412,11 @@ export const ChatPage = ({
           fileName: response.name,
           fileExtension: response.extension,
           fileUrl: response.url,
+          // Only set for csv/xls/xlsx — see storage_routes.ts's
+          // uploadAndIndex(). openai_provider.ts reads this back out of the
+          // saved conversation to attach the file to the code interpreter
+          // container's file_ids on every turn.
+          openaiFileId: response.openaiFileId,
         } as FileInput);
       }
     }
@@ -498,6 +517,75 @@ export const ChatPage = ({
         s.mcpStatus = `Waiting for approval to run "${chunk.name}" on ${chunk.server_label ?? "MCP server"}`;
         if (isVisible()) setMcpStatus(s.mcpStatus);
       }
+
+      if (chunk.type === "code_interpreter_call" && chunk.tool_call_id) {
+        s.activeTools = {
+          ...s.activeTools,
+          [chunk.tool_call_id]: {
+            name: "Code Interpreter",
+            args: "",
+            done: false,
+            source: "code_interpreter",
+            code: "",
+            status: "in_progress",
+            files: [],
+          },
+        };
+        if (isVisible()) setActiveTools(s.activeTools);
+      }
+
+      if (chunk.type === "code_interpreter_call_code_delta" && chunk.tool_call_id) {
+        const existing = s.activeTools[chunk.tool_call_id];
+        if (existing) {
+          s.activeTools = {
+            ...s.activeTools,
+            [chunk.tool_call_id]: { ...existing, code: (existing.code ?? "") + (chunk.delta ?? "") },
+          };
+          if (isVisible()) setActiveTools(s.activeTools);
+        }
+      }
+
+      if (chunk.type === "code_interpreter_call_code_done" && chunk.tool_call_id) {
+        const existing = s.activeTools[chunk.tool_call_id];
+        if (existing) {
+          s.activeTools = {
+            ...s.activeTools,
+            [chunk.tool_call_id]: { ...existing, code: chunk.code ?? existing.code },
+          };
+          if (isVisible()) setActiveTools(s.activeTools);
+        }
+      }
+
+      if (chunk.type === "code_interpreter_call_status" && chunk.tool_call_id) {
+        const existing = s.activeTools[chunk.tool_call_id];
+        if (existing) {
+          s.activeTools = {
+            ...s.activeTools,
+            [chunk.tool_call_id]: {
+              ...existing,
+              status: chunk.status,
+              done: chunk.status === "completed" || chunk.status === "failed",
+            },
+          };
+          if (isVisible()) setActiveTools(s.activeTools);
+        }
+      }
+
+      if (chunk.type === "code_interpreter_file") {
+        // OpenAI cites generated files on the response text, not tied to a
+        // specific call id — in practice there's only ever one open code
+        // interpreter call per turn, so attribute the file to the most
+        // recently started one still in this turn's activeTools.
+        const codeInterpreterEntries = Object.entries(s.activeTools).filter(([, t]) => t.source === "code_interpreter");
+        const targetId = codeInterpreterEntries[codeInterpreterEntries.length - 1]?.[0];
+        if (targetId && chunk.file_id && chunk.container_id) {
+          const existing = s.activeTools[targetId];
+          const files = [...(existing.files ?? []), { file_id: chunk.file_id, container_id: chunk.container_id, filename: chunk.filename, url: (chunk as any).url }];
+          s.activeTools = { ...s.activeTools, [targetId]: { ...existing, files } };
+          if (isVisible()) setActiveTools(s.activeTools);
+        }
+      }
+
       if (chunk.type === "sources" && Array.isArray((chunk as any).sources)) {
         const incoming = (chunk as any).sources as string[];
         s.sources = Array.from(new Set([...s.sources, ...incoming]));
@@ -522,9 +610,25 @@ export const ChatPage = ({
       if (chunk.isDone) {
         if (Array.isArray((chunk as any).sources) && (chunk as any).sources.length) {
           s.sources = Array.from(new Set([...s.sources, ...(chunk as any).sources]));
-          if (isVisible() && s.botMessageAdded) {
-            updateBotMessage(s, s.buffer);
-          }
+        }
+
+        // Fold this turn's code interpreter call(s) — code, final status,
+        // generated files — into the persisted assistant message before
+        // activeTools gets wiped by resetSessionStream() below. Without
+        // this, the card (and any chart image) the user just watched
+        // stream in would vanish the instant the reply finishes, only to
+        // reappear after a full page reload once it's read back from the DB.
+        const codeInterpreterParts: ContentPart[] = Object.values(s.activeTools)
+          .filter((t) => t.source === "code_interpreter")
+          .map((t) => ({
+            type: "code_interpreter",
+            code: t.code ?? "",
+            status: t.status ?? "completed",
+            files: t.files ?? [],
+          } as unknown as ContentPart));
+
+        if (isVisible() && (s.botMessageAdded || codeInterpreterParts.length)) {
+          updateBotMessage(s, s.buffer, codeInterpreterParts);
         }
         resetSessionStream(sessionIdForStream);
       }
@@ -550,7 +654,11 @@ export const ChatPage = ({
   return (
     <div className={`chat_plane ${className}`}>
       {showTopBar && (
-        <div className="chat_topbar"><h4>{title}</h4></div>
+        <div className="chat_topbar">
+          <span className="chat_topbar__brand" title={title}>
+            <OwlMark size={34} />
+          </span>
+        </div>
       )}
 
       <div className={chatMode ? "page" : "page_chatMode"} ref={pageRef}>
@@ -624,6 +732,18 @@ export const ChatPage = ({
                     if (m.type === "output_text" || m.type === "text") {
                       return <BotMessage key={`${i}-${j}`} text={(m as TextContent).text} />;
                     }
+                    if (m.type === "code_interpreter") {
+                      const ci = m as CodeInterpreterContent;
+                      return (
+                        <CodeInterpreterCard
+                          key={`${i}-${j}`}
+                          code={ci.code}
+                          status={ci.status}
+                          done
+                          files={ci.files ?? []}
+                        />
+                      );
+                    }
                     return null;
                   })}
                   {msgSources && msgSources.length > 0 && (
@@ -652,51 +772,31 @@ export const ChatPage = ({
           )}
           {isStreaming && sessionStreamsRef.current[activeSessionId ?? ""]?.buffer === "" && Object.keys(activeTools).length === 0 && (
             <div className="thinking-bubble">
-              <div className="dot-trio">
-                <span /><span /><span />
-              </div>
-              <span style={{ fontSize: 13, fontStyle: "italic", color: "var(--text-secondary)" }}>
-                Thinking…
-              </span>
+              <ThinkingOwl />
             </div>
           )}
 
-          {Object.entries(activeTools).map(([callId, tool]) => (
-            <div key={callId} className={`tool-card ${tool.done ? "done" : ""} ${tool.source === "mcp" ? "mcp-tool" : ""}`}>
-              <div className="tool-icon-wrap">
-                <div className="ring" />
-                <i
-                  className={`ti ${tool.done ? "ti-check" : tool.source === "mcp" ? "ti-plug" : "ti-math-function"}`}
-                  style={{
-                    position: "absolute", inset: 0, display: "flex",
-                    alignItems: "center", justifyContent: "center",
-                    fontSize: 15,
-                    color: tool.done ? "#0F6E56" : tool.source === "mcp" ? "#1D6FE0" : "#534AB7",
-                  }}
-                  aria-hidden="true"
-                />
-              </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 12, fontWeight: 500, display: "flex", alignItems: "center", gap: 6 }}>
-                  {tool.name}
-                  {tool.source === "mcp" && (
-                    <span className="mcp-badge">
-                      MCP{tool.serverLabel ? ` · ${tool.serverLabel}` : ""}
-                    </span>
-                  )}
-                </div>
-                <div style={{ fontSize: 11, display: "flex", alignItems: "center", gap: 5, color: "var(--text-secondary)" }}>
-                  <div className="tool-status-dot" />
-                  {tool.done ? `returned ${tool.result}` : tool.source === "mcp" ? "calling remote server…" : "executing…"}
-                </div>
-                {tool.args && (
-                  <div className="tool-args">
-                    {tool.args}{tool.done ? ` → ${tool.result}` : ""}
-                  </div>
-                )}
-              </div>
-            </div>
-          ))}
+          {Object.entries(activeTools).map(([callId, tool]) =>
+            tool.source === "code_interpreter" ? (
+              <CodeInterpreterCard
+                key={callId}
+                code={tool.code ?? ""}
+                status={tool.status}
+                done={tool.done}
+                files={tool.files ?? []}
+              />
+            ) : (
+              <ToolCallCard
+                key={callId}
+                name={tool.name}
+                args={tool.args}
+                result={tool.result}
+                done={tool.done}
+                source={tool.source}
+                serverLabel={tool.serverLabel}
+              />
+            )
+          )}
 
           {mcpStatus && <div className="mcp_status">{mcpStatus}</div>}
           <div ref={bottomAnchorRef} />

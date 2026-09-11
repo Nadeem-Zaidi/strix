@@ -5,6 +5,7 @@ import authenticationReducer from "../features/auth/authentication_slice";
 import { useDispatch, useSelector} from "react-redux";
 import { storageApi } from "../features/storage/storage_api";
 import sessionReducer from "../features/chat/session_slice_practice";
+import storageSearchReducer from "../features/storage/storage_search_slice";
 
 export const store = configureStore({
   reducer: {
@@ -12,6 +13,7 @@ export const store = configureStore({
     sideBar: sideBarReducer,
     authentication: authenticationReducer,
     session: sessionReducer,
+    storageSearch: storageSearchReducer,
     [storageApi.reducerPath]: storageApi.reducer,
   },
   middleware: (getDefaultMiddleware) =>

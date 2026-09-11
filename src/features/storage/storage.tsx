@@ -28,6 +28,14 @@ import {
   useListFilesQuery,
   useUploadFilesMutation,
 } from './storage_api';
+import { useAppDispatch, useAppSelector } from '../../store/store';
+import { clearStorageSearchQuery, setStorageSearchQuery } from './storage_search_slice';
+
+// How long to wait after the user stops typing before the search actually
+// fires — without this, every keystroke would dispatch a redux update and
+// (since that redux value drives the RTK Query arg) fire a new /list_files
+// request, which is wasteful and would make results flicker mid-word.
+const SEARCH_DEBOUNCE_MS = 350;
 
 const MAX_FILE_SIZE = 100 * 1024 * 1024;
 const MAX_CONCURRENT_UPLOADS = 3;
@@ -130,6 +138,24 @@ export function S3FolderBrowser() {
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
 
+  // Search: local state gives instant typing feedback; the redux value only
+  // updates after SEARCH_DEBOUNCE_MS of no typing, and that debounced value
+  // is what actually drives the useListFilesQuery arg below.
+  const dispatch = useAppDispatch();
+  const [searchInput, setSearchInput] = useState('');
+  const searchQuery = useAppSelector((s) => s.storageSearch.query);
+
+  useEffect(() => {
+    const handle = setTimeout(() => {
+      if (searchInput.trim()) {
+        dispatch(setStorageSearchQuery(searchInput.trim()));
+      } else {
+        dispatch(clearStorageSearchQuery());
+      }
+    }, SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(handle);
+  }, [searchInput, dispatch]);
+
   // NEW: multi-select + delete
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
   const [keysPendingDelete, setKeysPendingDelete] = useState<string[] | null>(null);
@@ -155,7 +181,10 @@ export function S3FolderBrowser() {
   const [pageTokens, setPageTokens] = useState<(string | undefined)[]>([undefined]);
   const [pageIndex, setPageIndex] = useState(0);
   const currentPageToken = pageTokens[pageIndex];
-  const { data, isLoading, isFetching, error } = useListFilesQuery(currentPageToken);
+  const { data, isLoading, isFetching, error } = useListFilesQuery({
+    continuationToken: currentPageToken,
+    search: searchQuery || undefined,
+  });
 
   useEffect(() => {
     if (!data?.continuationToken) return;
@@ -171,6 +200,15 @@ export function S3FolderBrowser() {
     setPageIndex(0);
     setPageTokens([undefined]);
   };
+
+  // A search result set isn't paginated the same way a plain listing is (the
+  // backend returns a flat, unpaginated match list — see storage_routes.ts),
+  // so a page cursor from browsing plain results is meaningless once a
+  // search starts, and vice versa when it's cleared.
+  useEffect(() => {
+    resetPagination();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchQuery]);
 
   const hasNextPage = Boolean(data?.continuationToken);
   const hasPrevPage = pageIndex > 0;
@@ -399,7 +437,23 @@ export function S3FolderBrowser() {
               <Search size={20} strokeWidth={2} />
               <Sparkles size={10} strokeWidth={2.5} className="sparkle-icon" />
             </div>
-            <input className="search-input" type="text" placeholder="Get answers from files" />
+            <input
+              className="search-input"
+              type="text"
+              placeholder="Search your files"
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+            />
+            {searchInput && (
+              <button
+                type="button"
+                className="search-input__clear"
+                aria-label="Clear search"
+                onClick={() => setSearchInput('')}
+              >
+                <X size={14} />
+              </button>
+            )}
           </div>
           <div className="storage-top-bar__actions"></div>
           <div className="action-icons">
@@ -515,9 +569,9 @@ export function S3FolderBrowser() {
                 </button>
               </div>
               <div className="cell">Name</div>
-              <div className="cell">Changed Date</div>
-              <div className="cell">Owner</div>
-              <div className="cell">Location</div>
+              <div className="cell date-cell">Changed Date</div>
+              <div className="cell owner-cell">Owner</div>
+              <div className="cell location-cell">Location</div>
               <div className="cell action-cell"></div>
             </div>
           )}
@@ -534,13 +588,13 @@ export function S3FolderBrowser() {
                       <div className="skeleton skeleton--icon" />
                       <div className="skeleton skeleton--text" style={{ width: '55%' }} />
                     </div>
-                    <div className="cell">
+                    <div className="cell date-cell">
                       <div className="skeleton skeleton--text" style={{ width: '70%' }} />
                     </div>
-                    <div className="cell">
+                    <div className="cell owner-cell">
                       <div className="skeleton skeleton--text" style={{ width: '40%' }} />
                     </div>
-                    <div className="cell">
+                    <div className="cell location-cell">
                       <div className="skeleton skeleton--text" style={{ width: '50%' }} />
                     </div>
                     <div className="cell action-cell" />
@@ -559,9 +613,19 @@ export function S3FolderBrowser() {
 
             {!isLoading && !error && files.length === 0 && (
               <div className="empty-state">
-                <FolderUp size={28} />
-                <div className="empty-state__title">No files yet</div>
-                <div className="empty-state__subtitle">Upload a file to get started.</div>
+                {searchQuery ? (
+                  <>
+                    <Search size={28} />
+                    <div className="empty-state__title">No results for "{searchQuery}"</div>
+                    <div className="empty-state__subtitle">Try a different name or clear the search.</div>
+                  </>
+                ) : (
+                  <>
+                    <FolderUp size={28} />
+                    <div className="empty-state__title">No files yet</div>
+                    <div className="empty-state__subtitle">Upload a file to get started.</div>
+                  </>
+                )}
               </div>
             )}
 
@@ -590,7 +654,7 @@ export function S3FolderBrowser() {
                       <Icon size={18} className={className} />
                       <span className="truncate">{file.name}</span>
                     </div>
-                    <div className="cell">
+                    <div className="cell date-cell">
                       <span className="truncate text-secondary">{file.lastModified ?? '—'}</span>
                     </div>
                     <div className="cell owner-cell">
