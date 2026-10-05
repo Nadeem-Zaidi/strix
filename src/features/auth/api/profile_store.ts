@@ -1,4 +1,4 @@
-import type { IDatabase, Mappable } from "../../types";
+import type { IDatabase, Mappable } from "@/shared/types";
 import {
     collection,
     getDocs,
@@ -9,6 +9,7 @@ import {
     where,
     Firestore,
     addDoc,
+    setDoc,
 } from "firebase/firestore";
 
 
@@ -27,6 +28,18 @@ export class Firebase_Storage<T extends Mappable> implements IDatabase<T> {
         const snapShot = await getDocs(q);
         return snapShot.docs.map((item) => this.fromMap({ id: item.id, ...item.data() }));
     }
+    // null when the document doesn't exist.
+    async getById(id: string): Promise<T | null> {
+        const snapShot = await getDoc(doc(this.db, this.collectionName, id));
+        if (!snapShot.exists()) return null;
+        return this.fromMap({ id: snapShot.id, ...snapShot.data() });
+    }
+
+    // Writes the document under a known id (e.g. the user's uid).
+    async setOne(id: string, e: T): Promise<void> {
+        await setDoc(doc(this.db, this.collectionName, id), e.toMap());
+    }
+
     async getOne(id: string): Promise<T> {
         const snapShot = await getDoc(doc(this.db, this.collectionName, id));
         if (!snapShot.exists) throw new Error(`${id} not found`);

@@ -1,32 +1,7 @@
-/* ═══════════════════════════════════════
-   DESIGN TOKENS
-   ═══════════════════════════════════════ */
-:root {
-    --accent: #4f46e5;
-    --accent-hover: #4338ca;
-    --accent-soft: #eef2ff;
-    --danger: #dc2626;
-    --danger-hover: #b91c1c;
-    --danger-soft: #fef2f2;
-    --success: #16a34a;
-
-    --bg: #f7f8fb;
-    --surface: #ffffff;
-    --border: #e5e7eb;
-    --border-soft: #f0f1f3;
-
-    --text-primary: #111827;
-    --text-secondary: #6b7280;
-    --text-tertiary: #9ca3af;
-
-    --radius-sm: 8px;
-    --radius-md: 12px;
-    --radius-lg: 16px;
-
-    --shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.06);
-    --shadow-md: 0 8px 24px rgba(16, 24, 40, 0.10), 0 2px 6px rgba(16, 24, 40, 0.05);
-    --shadow-lg: 0 20px 50px rgba(16, 24, 40, 0.18);
-}
+/* ═══════════════════════════════════════════════════════════════════
+   Knowledge base
+   File explorer, uploads and the docked chat panel.
+   ═══════════════════════════════════════════════════════════════════ */
 
 * {
     box-sizing: border-box;
@@ -38,6 +13,9 @@
 .app-shell {
     display: flex;
     height: 100vh;
+    /* dvh tracks the mobile browser's real visible height as the URL bar
+       shows/hides, so nothing gets pushed below the fold */
+    height: 100dvh;
     width: 100%;
     overflow: hidden;
     background: var(--bg);
@@ -50,18 +28,42 @@
     flex: 1;
     min-width: 0;
     height: 100%;
-    overflow: auto;
-    padding: 20px 28px 28px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 20px clamp(14px, 3vw, 32px) 28px;
+    /* Columns respond to the space this pane actually has (which shrinks
+       when the chat panel docks open), not just the window width */
+    container-type: inline-size;
+    container-name: storage;
 }
 
 /* ═══════════════════════════════════════
-   TOP BAR
+   HEADER (back · title · actions)
+   ═══════════════════════════════════════ */
+.storage-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-shrink: 0;
+}
+
+.storage-header__back {
+    flex-shrink: 0;
+    margin-left: -6px;
+}
+
+.storage-header__titles {
+    flex: 1;
+    min-width: 0;
+}
+
+/* ═══════════════════════════════════════
+   SEARCH BAR
    ═══════════════════════════════════════ */
 .storage-top-bar {
     display: flex;
-    flex-direction: row;
-    align-items: center;
-    gap: 16px;
+    margin-top: 18px;
+    flex-shrink: 0;
 }
 
 .storage-top-bar__search_bar {
@@ -75,7 +77,7 @@
     border: 1px solid var(--border);
     transition: border-color 0.15s ease, box-shadow 0.15s ease;
     box-sizing: border-box;
-    width: 60%;
+    max-width: 760px;
     box-shadow: var(--shadow-sm);
 }
 
@@ -108,6 +110,14 @@
     padding: 0.625rem 0.75rem;
     font-family: inherit;
     width: 100%;
+    min-width: 0;
+    -webkit-appearance: none;
+    appearance: none;
+}
+
+/* type="search" adds a native clear "x" — we render our own */
+.search-input::-webkit-search-cancel-button {
+    -webkit-appearance: none;
 }
 
 .search-input::placeholder {
@@ -180,12 +190,17 @@
    HEADING
    ═══════════════════════════════════════ */
 .storage-heading {
-    margin-top: 20px;
-    margin-bottom: 14px;
-    font-size: 24px;
-    font-weight: 600;
+    font-size: clamp(18px, 1.2rem + 0.6vw, 24px);
+    font-weight: 650;
+    line-height: 1.25;
     color: var(--text-primary);
-    letter-spacing: -0.01em;
+    letter-spacing: -0.015em;
+}
+
+.storage-subheading {
+    margin-top: 2px;
+    font-size: 13px;
+    color: var(--text-secondary);
 }
 
 /* ═══════════════════════════════════════
@@ -195,7 +210,7 @@
     font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
     color: var(--text-primary);
     width: 100%;
-    min-width: 800px;
+    margin-top: 18px;
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
@@ -203,9 +218,10 @@
     overflow: hidden;
     display: flex;
     flex-direction: column;
-    /* Keep the card from growing past the viewport — rows scroll inside it
-       instead, while the header row and pager stay put. */
-    max-height: calc(100vh - 190px);
+    /* Sized to content but allowed to shrink into whatever height is left
+       below the header — rows then scroll inside the card while the header
+       row and pager stay put. No hard-coded viewport offsets. */
+    flex: 0 1 auto;
     min-height: 220px;
 }
 
@@ -312,6 +328,20 @@
     color: var(--text-primary);
 }
 
+.name-cell__text {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.name-cell__meta {
+    display: none;
+    font-size: 12px;
+    font-weight: 400;
+    color: var(--text-tertiary);
+    margin-top: 1px;
+}
+
 .action-cell {
     justify-content: flex-end;
     padding-right: 0;
@@ -322,8 +352,24 @@
     color: var(--text-tertiary);
 }
 
-.list-item:hover .row-delete-btn {
+.list-item:hover .row-delete-btn,
+.row-delete-btn:focus-visible {
     opacity: 1;
+}
+
+@media (hover: none) {
+    /* Touch screens have no hover — keep the delete action reachable */
+    .row-delete-btn {
+        opacity: 1;
+    }
+
+    .list-item:hover {
+        background-color: transparent;
+    }
+
+    .list-item--selected:hover {
+        background-color: var(--accent-soft);
+    }
 }
 
 .row-delete-btn:hover {
@@ -342,13 +388,40 @@
 }
 
 /* File type icon colors */
-.file-icon--pdf { color: #dc2626; flex-shrink: 0; }
-.file-icon--doc { color: #2563eb; flex-shrink: 0; }
-.file-icon--sheet { color: #16a34a; flex-shrink: 0; }
-.file-icon--image { color: #9333ea; flex-shrink: 0; }
-.file-icon--code { color: #ea580c; flex-shrink: 0; }
-.file-icon--default { color: var(--text-tertiary); flex-shrink: 0; }
-.file-icon--error { color: var(--danger); flex-shrink: 0; }
+.file-icon--pdf {
+    color: #dc2626;
+    flex-shrink: 0;
+}
+
+.file-icon--doc {
+    color: #2563eb;
+    flex-shrink: 0;
+}
+
+.file-icon--sheet {
+    color: #16a34a;
+    flex-shrink: 0;
+}
+
+.file-icon--image {
+    color: #9333ea;
+    flex-shrink: 0;
+}
+
+.file-icon--code {
+    color: #ea580c;
+    flex-shrink: 0;
+}
+
+.file-icon--default {
+    color: var(--text-tertiary);
+    flex-shrink: 0;
+}
+
+.file-icon--error {
+    color: var(--danger);
+    flex-shrink: 0;
+}
 
 /* Avatar */
 .avatar {
@@ -487,10 +560,6 @@
     background: var(--border-soft);
 }
 
-.load-more-btn {
-    margin: 12px 16px 16px;
-}
-
 /* ═══════════════════════════════════════
    EMPTY STATE
    ═══════════════════════════════════════ */
@@ -559,8 +628,13 @@
 }
 
 @keyframes skeleton-shimmer {
-    0% { background-position: 100% 50%; }
-    100% { background-position: 0 50%; }
+    0% {
+        background-position: 100% 50%;
+    }
+
+    100% {
+        background-position: 0 50%;
+    }
 }
 
 /* ═══════════════════════════════════════
@@ -579,8 +653,13 @@
 }
 
 @keyframes modal-fade-in {
-    from { opacity: 0; }
-    to { opacity: 1; }
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
 }
 
 .modal {
@@ -597,8 +676,15 @@
 }
 
 @keyframes modal-scale-in {
-    from { opacity: 0; transform: scale(0.97) translateY(6px); }
-    to { opacity: 1; transform: scale(1) translateY(0); }
+    from {
+        opacity: 0;
+        transform: scale(0.97) translateY(6px);
+    }
+
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
 }
 
 .modal__header {
@@ -691,46 +777,79 @@
    AI TRIGGER
    ═══════════════════════════════════════ */
 .ai-icon {
-    position: absolute;
-    right: 24px;
-    bottom: 24px;
+    /* Was `position: absolute`, anchored to its parent container rather
+       than the actual screen. A mobile browser's visible viewport height
+       changes as the address bar shows/hides, but the container's CSS
+       height doesn't track that the same way — so the button could end up
+       positioned below the fold, visible only as a sliver at the very
+       bottom edge. `fixed` anchors it to the real viewport instead, so it
+       reliably sits in the bottom-right corner regardless of page height
+       or scroll position. */
+
+    /* Extended pill ("icon + Ask AI") on roomy screens, collapses to a
+       round button on phones — see the container query further down. */
+    position: fixed;
+    right: 28px;
+    bottom: calc(28px + var(--safe-bottom));
     z-index: 50;
-    width: 56px;
-    height: 56px;
-    border-radius: 50%;
-    border: none;
-    padding: 0;
+    height: 52px;
+    padding: 0 22px 0 18px;
+    border-radius: 9999px;
+    border: 1px solid rgba(255, 255, 255, 0.14);
     cursor: pointer;
-    display: flex;
+    display: inline-flex;
     align-items: center;
     justify-content: center;
-    background: linear-gradient(135deg, var(--accent), #7c6ff0);
-    box-shadow: 0 4px 14px rgba(79, 70, 229, 0.35), 0 1px 3px rgba(0, 0, 0, 0.08);
-    transition: transform 0.18s ease, box-shadow 0.18s ease;
+    gap: 10px;
+    color: #fff;
+    font-family: inherit;
+    font-size: 14.5px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    background: linear-gradient(135deg, #4f46e5 0%, #6d28d9 100%);
+    box-shadow: 0 10px 24px -6px rgba(79, 70, 229, 0.55),
+        0 2px 6px rgba(17, 24, 39, 0.12),
+        inset 0 1px 0 rgba(255, 255, 255, 0.18);
+    transition: transform 0.18s ease, box-shadow 0.18s ease, filter 0.18s ease;
+    -webkit-tap-highlight-color: transparent;
+    animation: ai-icon-in 0.35s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .ai-icon:hover {
-    transform: translateY(-2px) scale(1.04);
-    box-shadow: 0 8px 22px rgba(79, 70, 229, 0.4), 0 2px 6px rgba(0, 0, 0, 0.1);
+    transform: translateY(-2px);
+    filter: brightness(1.06);
+    box-shadow: 0 14px 30px -6px rgba(79, 70, 229, 0.6),
+        0 3px 8px rgba(17, 24, 39, 0.14),
+        inset 0 1px 0 rgba(255, 255, 255, 0.2);
 }
 
 .ai-icon:active {
     transform: scale(0.96);
 }
 
-.ai-icon::before {
-    content: "";
-    position: absolute;
-    inset: -6px;
-    border-radius: 50%;
-    border: 1.5px solid rgba(79, 70, 229, 0.35);
-    animation: ai-icon-pulse 2.4s ease-out infinite;
+.ai-icon:focus-visible {
+    outline: 3px solid var(--accent-soft);
+    outline-offset: 3px;
 }
 
-@keyframes ai-icon-pulse {
-    0% { transform: scale(0.9); opacity: 0.6; }
-    70% { transform: scale(1.25); opacity: 0; }
-    100% { opacity: 0; }
+.ai-icon svg {
+    flex-shrink: 0;
+}
+
+.ai-icon__label {
+    white-space: nowrap;
+}
+
+@keyframes ai-icon-in {
+    from {
+        opacity: 0;
+        transform: translateY(12px) scale(0.92);
+    }
+
+    to {
+        opacity: 1;
+        transform: none;
+    }
 }
 
 /* ═══════════════════════════════════════
@@ -748,12 +867,12 @@
 }
 
 .chat-side-panel--open {
-    width: 420px;
+    width: var(--chat-panel-w);
 }
 
 .chat-side-panel__inner {
     position: relative;
-    width: 420px;
+    width: var(--chat-panel-w);
     height: 100%;
     display: flex;
     flex-direction: column;
@@ -862,8 +981,15 @@
 }
 
 @keyframes upload-menu-in {
-    from { opacity: 0; transform: translateY(-4px); }
-    to { opacity: 1; transform: translateY(0); }
+    from {
+        opacity: 0;
+        transform: translateY(-4px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 .upload-menu__item {
@@ -928,8 +1054,15 @@
 }
 
 @keyframes slide-up {
-    from { opacity: 0; transform: translateY(20px); }
-    to { opacity: 1; transform: translateY(0); }
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 .upload-manager__header {
@@ -1028,145 +1161,279 @@
     padding: 2px;
 }
 
-/* ═══════════════════════════════════════
-   MOBILE RESPONSIVE
-   This page previously had zero @media rules — the top bar's 60%-width
-   search field plus icon buttons, the file grid's `min-width: 800px`,
-   the 420px-wide AI chat side panel, and the fixed-width upload
-   dropdown/manager all assumed desktop-class width and simply overflowed
-   or got clipped on a phone screen.
+@container storage (max-width: 980px) {
+    /* ═══════════════════════════════════════
+   RESPONSIVE — FILE TABLE (container queries)
+   Keyed to the width of .storage-main itself, so the table adapts the
+   same way whether the window is narrow or the chat panel has docked
+   open and eaten half the space. Less important columns drop out first;
+   the date folds under the file name once its column is gone.
    ═══════════════════════════════════════ */
-@media (max-width: 860px) {
-    .storage-main {
-        padding: 14px 14px 20px;
+    .file-row {
+        grid-template-columns: 40px 2fr 1.3fr 1fr 48px;
     }
 
-    .storage-top-bar {
-        flex-wrap: wrap;
-        row-gap: 10px;
+    .location-cell {
+        display: none;
+    }
+}
+
+@container storage (max-width: 760px) {
+    .file-row {
+        grid-template-columns: 40px 1fr 150px 48px;
     }
 
-    .storage-top-bar__search_bar {
-        order: 2;
+    .owner-cell {
+        display: none;
+    }
+}
+
+@container storage (max-width: 560px) {
+    .file-row {
+        grid-template-columns: 34px 1fr 40px;
+    }
+
+    .date-cell {
+        display: none;
+    }
+
+    .name-cell__meta {
+        display: block;
+    }
+
+    .list-header {
+        padding: 12px 12px;
+    }
+
+    .list-item,
+    .skeleton-row {
+        padding: 10px 12px;
+    }
+
+    .cell {
+        padding-right: 10px;
+        font-size: 14px;
+    }
+
+    .action-cell {
+        padding-right: 0;
+    }
+
+    .selection-bar {
+        padding: 8px 12px;
+        gap: 8px;
+    }
+
+    .storage-pagination {
+        padding: 10px 12px;
+    }
+
+    /* Collapse the extended "Ask AI" pill to a round button */
+    .ai-icon {
+        width: 56px;
+        height: 56px;
+        padding: 0;
+        gap: 0;
+    }
+
+    .ai-icon__label {
+        display: none;
+    }
+
+    .ai-icon svg {
+        width: 24px;
+        height: 24px;
+    }
+}
+
+@container storage (max-width: 420px) {
+    /* Upload stays; the two secondary actions make room for the title */
+    .action-icons > .icon-button,
+    .action-icons__divider {
+        display: none;
+    }
+
+    .storage-subheading {
+        font-size: 12px;
+    }
+}
+
+@media (max-width: 900px) {
+    /* ═══════════════════════════════════════
+   RESPONSIVE — LAYOUT (viewport)
+   ═══════════════════════════════════════ */
+
+    /* Tablet & phone: chat becomes a full-screen sheet instead of a docked
+   column that would squeeze the file list to nothing. */
+    .chat-side-panel {
+        border-left: none;
+        transition: none;
+    }
+
+    .chat-side-panel--open {
+        position: fixed;
+        inset: 0;
         width: 100%;
+        height: 100%;
+        z-index: 100;
+        animation: chat-sheet-in 0.32s cubic-bezier(0.22, 1, 0.36, 1);
     }
 
-    .action-icons {
-        order: 1;
-        margin-left: auto;
+    .chat-side-panel__inner {
+        width: 100%;
+        padding-bottom: var(--safe-bottom);
+    }
+
+    .chat-side-panel__close {
+        top: 10px;
+        right: 12px;
+        width: 36px;
+        height: 36px;
+    }
+
+    /* Was anchored to .storage-main; on mobile that container can be
+       taller than the visible viewport, so pin it to the screen instead. */
+    .upload-manager {
+        position: fixed;
+        left: 12px;
+        right: 12px;
+        bottom: calc(12px + var(--safe-bottom));
+        width: auto;
+        max-width: 480px;
+        margin: 0 auto;
+        max-height: 60dvh;
+        z-index: 60;
+    }
+
+    .upload-manager__body {
+        flex: 1;
+        min-height: 0;
+        max-height: none;
+    }
+}
+
+@keyframes chat-sheet-in {
+    from {
+        transform: translateY(24px);
+        opacity: 0;
+    }
+
+    to {
+        transform: none;
+        opacity: 1;
+    }
+}
+
+@media (max-width: 640px) {
+    .storage-main {
+        padding-top: 12px;
+        padding-bottom: calc(96px + var(--safe-bottom)); /* clear the FAB */
+    }
+
+    .storage-header {
+        gap: 8px;
+    }
+
+    .storage-top-bar,
+    .storage-file-list-container {
+        margin-top: 14px;
+    }
+
+    .upload-btn {
+        height: 40px;
+        padding: 0 12px;
+        gap: 4px;
     }
 
     .upload-btn span {
         display: none;
     }
 
-    .upload-btn {
-        padding: 0 10px;
-        gap: 0;
+    .icon-button {
+        width: 40px;
+        height: 40px;
     }
 
-    .storage-heading {
-        margin-top: 14px;
-        margin-bottom: 10px;
-        font-size: 19px;
+    /* 16px stops iOS Safari from zooming the page on focus */
+    .search-input {
+        font-size: 16px;
+        padding: 0.6rem 0.5rem;
     }
 
-    /* The grid used to force an 800px-wide card that just spilled off the
-       screen. Dropping the less essential columns (they're not clipped —
-       the JSX still renders them, they're just hidden) lets the remaining
-       checkbox/name/action columns fit a phone width without any
-       horizontal scrolling. */
     .storage-file-list-container {
-        min-width: 0;
-        max-height: calc(100vh - 220px);
-    }
-
-    .file-row {
-        grid-template-columns: 32px 1fr 42px;
-    }
-
-    .date-cell,
-    .owner-cell,
-    .location-cell {
-        display: none;
-    }
-
-    .selection-bar__count {
-        font-size: 12.5px;
-    }
-
-    /* Was `position: absolute; right: 0` relative to the upload button's own
-       wrapper — fine on desktop, but once the top bar wraps/reflows on
-       mobile (the button can end up hugging either edge depending on how
-       much the row shrank) that relative math produces a dropdown that's
-       partly or mostly off-screen instead of sitting under the button.
-       Anchoring it to the viewport instead sidesteps that entirely: it
-       always lands as a clean sheet near the top, regardless of where the
-       trigger button ended up. */
-    .upload-menu__dropdown {
-        position: fixed;
-        top: 64px;
-        left: 12px;
-        right: 12px;
-        width: auto;
-    }
-
-    /* Was anchored `right: 100px` with a fixed 320px width — on a narrow
-       screen that math pushes it partly off the left edge. Pin it as a
-       full-width sheet near the bottom instead. */
-    .upload-manager {
-        left: 12px;
-        right: 12px;
-        bottom: 12px;
-        width: auto;
-        max-height: 60vh;
+        border-radius: var(--radius-md);
     }
 
     .ai-icon {
         right: 16px;
-        bottom: 16px;
-        width: 50px;
-        height: 50px;
+        bottom: calc(16px + var(--safe-bottom));
     }
 
-    /* The AI chat panel was a docked 420px-wide flex column — next to a
-       ~375px viewport that leaves negative space for the file list.
-       Below this breakpoint it becomes a full-screen overlay instead. */
-    .chat-side-panel--open {
-        position: fixed;
-        inset: 0;
-        width: 100%;
-        z-index: 100;
+    /* Hide the AI button while uploads show — they share the corner */
+    .upload-manager ~ .ai-icon {
+        display: none;
     }
 
-    .chat-side-panel__inner {
+    /* Dialogs become bottom sheets with full-width, thumb-sized actions */
+    .modal-overlay {
+        align-items: flex-end;
+    }
+
+    .modal {
         width: 100%;
+        max-width: 100%;
+        max-height: 88dvh;
+        border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+        padding-bottom: var(--safe-bottom);
+        animation: modal-sheet-in 0.26s cubic-bezier(0.16, 1, 0.3, 1);
     }
 
     .modal__header {
-        padding: 14px 16px;
-        flex-wrap: wrap;
-        gap: 10px;
+        padding: 16px;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 12px;
     }
 
     .modal__actions {
         width: 100%;
-        justify-content: flex-end;
+        order: 2;
+    }
+
+    .modal__actions .btn {
+        flex: 1;
+        justify-content: center;
+        height: 42px;
+    }
+
+    .file-review-row {
+        padding: 10px 8px;
+    }
+
+    .file-review-row .icon-button--sm {
+        width: 36px;
+        height: 36px;
     }
 }
 
-@media (max-width: 480px) {
-    .storage-heading {
-        font-size: 17px;
+@keyframes modal-sheet-in {
+    from {
+        transform: translateY(100%);
     }
 
-    .icon-button {
-        width: 34px;
-        height: 34px;
+    to {
+        transform: none;
     }
+}
 
-    .action-icons__divider {
-        display: none;
+@media (prefers-reduced-motion: reduce) {
+    .ai-icon,
+    .chat-side-panel,
+    .chat-side-panel--open,
+    .modal,
+    .upload-manager {
+        animation: none;
+        transition: none;
     }
 }
 
@@ -1178,11 +1445,30 @@
     animation: spin 1s linear infinite;
 }
 
-.text-blue-500 { color: #3b82f6; }
-.text-green-500 { color: var(--success); }
-.text-red-500 { color: var(--danger); }
+.text-blue-500 {
+    color: #3b82f6;
+}
+
+.text-green-500 {
+    color: var(--success);
+}
+
+.text-red-500 {
+    color: var(--danger);
+}
 
 @keyframes spin {
-    from { transform: rotate(0deg); }
-    to { transform: rotate(360deg); }
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
 }

@@ -20,4 +20,17 @@ export default defineConfig([
       globals: globals.browser,
     },
   },
+  // Project conventions (docs/frontend-architecture.md).
+  {
+    files: ['src/**/*.{ts,tsx}'],
+    ignores: ['src/main.tsx'],
+    rules: {
+      'no-restricted-imports': ['error', {
+        patterns: [
+          { group: ['*.css'], message: 'Styles are imported once, from src/styles/index.css — add your stylesheet there.' },
+          { group: ['../../*'], message: 'Use the "@/" alias for imports outside this folder (e.g. "@/shared/ui/ui").' },
+        ],
+      }],
+    },
+  },
 ])

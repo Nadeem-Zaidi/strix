@@ -1,5 +1,5 @@
 import { onAuthStateChanged } from "firebase/auth";
-import { auth } from "../../shared/firebase_config";
+import { auth } from "@/shared/lib/firebase";
 
 export abstract class BaseApi {
     protected baseUrl: string
@@ -44,7 +44,7 @@ export abstract class BaseApi {
 
             try {
                 const error = await response.json();
-                message = error.error ?? message;
+                message = error.error ?? error.message ?? message;
             } catch {
                 message = await response.text();
             }
@@ -52,6 +52,8 @@ export abstract class BaseApi {
             throw new Error(message);
         }
 
+        // 204 No Content (e.g. deletes) has no body to parse.
+        if (response.status === 204) return undefined as T;
         return await response.json() as T;
     }
 

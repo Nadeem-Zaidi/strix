@@ -1,75 +1,45 @@
-# React + TypeScript + Vite
+# Owl Bot — web app
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+React + TypeScript + Vite frontend for Owl Bot: chat with ChatGPT or Claude,
+search and explain documents in your knowledge base, and connect WhatsApp.
 
-Currently, two official plugins are available:
+Backend: `../../node_prac/owlbot` (must be running).
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Run it
 
-## React Compiler
-
-The React Compiler is enabled on this template. See [this documentation](https://react.dev/learn/react-compiler) for more information.
-
-Note: This will impact Vite dev & build performances.
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm install
+npm run dev               # http://localhost:5173
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+`.env` needs one variable:
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+| Variable | What |
+|---|---|
+| `VITE_API_URL` | Backend chat API, e.g. `http://localhost:3000/api` |
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+Firebase web settings live in `src/shared/lib/firebase.ts` (these are
+public by design). Anything prefixed `VITE_` is bundled into the browser code,
+so never put server secrets in this `.env`.
+
+| Script | Does |
+|---|---|
+| `npm run dev` | Dev server with hot reload |
+| `npm run build` | Type-check and build to `dist/` |
+| `npm run lint` | ESLint |
+
+## Layout
+
 ```
+src/
+  main.tsx                 entry point (imports styles/index.css — the only CSS import)
+  app/                     routes (App.tsx), page frame (app_shell.tsx), Redux store
+  shared/                  used by several features: api/, lib/ (Firebase), ui/ (UI kit), types
+  styles/                  index.css (cascade order), tokens, base, layout, themes/
+  features/                auth, chat, whatsapp, agents, pipelines, native_agents,
+                           storage, insights, billing — each with api/, components/,
+                           state/, styles/ as needed
+docs/                      architecture, deployment notes, sample data
+```
+
+Where code and styles go, and the CSS conventions: [docs/frontend-architecture.md](docs/frontend-architecture.md).

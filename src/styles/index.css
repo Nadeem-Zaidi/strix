@@ -1,0 +1,37 @@
+/* ═══════════════════════════════════════════════════════════════════
+   Style entry point — the ONLY stylesheet imported from TypeScript
+   (src/main.tsx). The order below IS the cascade order: when two rules
+   have the same specificity, the later file wins. Components never import
+   CSS themselves, so this order can't drift with the module graph.
+   Fonts load from index.html (<link>), not @import.
+
+   Conventions (docs/frontend-architecture.md):
+   - tokens, base and layout first, then the shared UI kit, then features;
+   - a feature's styles live in features/<name>/styles/ and are listed here;
+   - only the theme (last) overrides other files' rules on purpose.
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* Foundation */
+@import "./tokens.css";
+@import "./base.css";
+@import "./layout.css";
+
+/* Shared UI */
+@import "../shared/ui/ui.css";
+
+/* Features */
+@import "../features/auth/styles/auth.css";
+@import "../features/storage/styles/storage.css";
+@import "../features/chat/styles/sidebar.css";
+@import "../features/chat/styles/chat_page.css";
+@import "../features/chat/styles/messages.css";
+@import "../features/chat/styles/composer.css";
+@import "../features/whatsapp/styles/whatsapp.css";
+@import "../features/agents/styles/agents.css";
+@import "../features/pipelines/styles/pipelines.css";
+@import "../features/native_agents/styles/native_agents.css";
+@import "../features/billing/styles/billing.css";
+@import "../features/insights/styles/insights.css";
+
+/* Theme — swap for ./themes/sand.css (or remove) to change the look. */
+@import "./themes/sky.css";

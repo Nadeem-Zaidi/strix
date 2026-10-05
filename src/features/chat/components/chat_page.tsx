@@ -1,7 +1,13 @@
-import { useEffect, useRef, useState } from "react";
-import "./chat.css";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useSelector } from "react-redux";
-import { useAppDispatch } from "../../store/store";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { ArrowUp, BookOpenText, Lightbulb, Search, Square, X, Zap } from "lucide-react";
+import { useAppDispatch, useAppSelector } from "@/app/store";
+import { auth } from "@/shared/lib/firebase";
+import { agentsApi } from "@/features/agents/api/agents_api";
+import type { Agent } from "@/features/agents/types";
+import { nativeAgentsApi, PROVIDER_LABEL, type NativeAgent } from "@/features/native_agents/api/native_agents_api";
+import { BrowserApprovalCard, BrowserScreenshot, type BrowserApproval, type BrowserApprovalRequest } from "@/features/native_agents/components/browser_approval";
 import type {
   CodeInterpreterContent,
   CodeInterpreterFileRef,
@@ -9,20 +15,41 @@ import type {
   FileAttachment,
   FileInput,
   ImageUrlContent,
+  KnowledgeDocument,
   LLMFileUploadResponse,
   LLMMessage,
+  MessageUsage,
+  Session,
   TextAttachment,
   TextContent,
-} from "../../types";
+} from "@/shared/types";
 
-import { updateChatMode } from "./chat_mode_slice";
-import { api, type StreamChunk } from "./api";
-import { BotMessage } from "./bot_message";
-import { appendCacheMessage, clearCacheMessage, closeWindow, endSessionStream, loadMessages, loadSessions, newSession, openWindow, replaceLastMessage, setChatMode, startSessionStream } from "./session_slice_practice";
-import { FileComponent } from "./file_component";
-import { CodeInterpreterCard } from "./code_interpreter_card";
-import { ToolCallCard } from "./tool_call_card";
-import { ThinkingOwl, OwlMark } from "./owl_icon";
+import { updateChatMode } from "@/features/chat/state/chat_mode_slice";
+import { api, type StreamChunk } from "@/features/chat/api/chat_api";
+import { BotMessage } from "@/features/chat/components/bot_message";
+import { formatTokens } from "@/features/insights/api/insights_api";
+import { appendCacheMessage, clearCacheMessage, closeWindow, endSessionStream, loadMessages, loadSessions, newSession, openWindow, replaceLastMessage, setActiveSession, setChatMode, startSessionStream } from "@/features/chat/state/session_slice";
+import { FileComponent } from "@/features/chat/components/file_component";
+import { CodeInterpreterCard } from "@/features/chat/components/code_interpreter_card";
+import { ToolCallCard } from "@/features/chat/components/tool_call_card";
+import { ThinkingOwl, OwlMark } from "@/shared/ui/owl_icon";
+import { ModelSelector } from "@/features/chat/components/model_selector";
+import { useLLMProvider } from "@/features/chat/hooks/use_llm_provider";
+import { AttachMenu } from "@/features/chat/components/attach_menu";
+import { DocumentPicker } from "@/features/chat/components/document_picker";
+import { WhatsAppConnect } from "@/features/whatsapp/components/whatsapp_connect";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faWhatsapp } from "@fortawesome/free-brands-svg-icons";
+import { DocumentCard, SourceChips } from "@/features/chat/components/knowledge_parts";
+import { AgentAvatar } from "@/shared/ui/agent_avatar";
+import { asDocumentPart, buildExplainDocumentParts, displayName, KB_SEARCH_INSTRUCTION } from "@/features/chat/lib/chat_utils";
+
+function greeting(): string {
+  const hour = new Date().getHours();
+  const part = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+  const firstName = auth.currentUser?.displayName?.split(" ")[0];
+  return firstName ? `${part}, ${firstName}` : part;
+}
 
 
 export interface ChatPageProps {
@@ -53,8 +80,8 @@ function extractSourceFilenames(output: string | undefined): string[] {
     if (!Array.isArray(results)) return [];
     return results
       .map((r: any) => r?.source_file)
-      .filter((f: unknown): f is string => typeof f === "string" && f.length > 0)
-      .map((f: string) => f.split("/").pop() || f);
+      // Full keys, not basenames — clicking a source fetches the document by key.
+      .filter((f: unknown): f is string => typeof f === "string" && f.length > 0);
   } catch {
     return [];
   }
@@ -89,29 +116,63 @@ function getSourcesForAssistantMessage(messages: LLMMessage[], assistantIndex: n
   return Array.from(sources);
 }
 
+// Shows a provider agent with the same header/welcome/chip as a regular agent.
+const nativeAsAgent = (n: NativeAgent): Agent => ({
+  id: n.id,
+  name: n.name,
+  icon: n.icon,
+  description: n.description || `${PROVIDER_LABEL[n.provider]} agent`,
+  instructions: n.instructions,
+  provider: n.provider,
+  model: n.model,
+  builtin_tools: [],
+  document_keys: [],
+  starters: [],
+  instruction_files: [],
+  created_at: n.created_at,
+  updated_at: n.updated_at,
+});
+
+// "⚡ 7.1k tokens" under a reply; hover for the breakdown.
+const UsageBadge = ({ usage }: { usage: MessageUsage }) => {
+  const cached = usage.cache_read_tokens + usage.cache_write_tokens;
+  const detail = [
+    `Input: ${usage.input_tokens.toLocaleString()}`,
+    cached ? `Cached input: ${cached.toLocaleString()}` : null,
+    `Output: ${usage.output_tokens.toLocaleString()}`,
+    usage.requests > 1 ? `${usage.requests} model calls (tools)` : null,
+    usage.model ? `Model: ${usage.model}` : null,
+  ].filter(Boolean).join("\n");
+  return <span className="msg_usage" title={detail}><Zap size={11} /> {formatTokens(usage.total_tokens)} tokens</span>;
+};
+
 type SessionStreamState = {
   buffer: string;
   botMessageAdded: boolean;
   activeTools: Record<string, ToolInfo>;
   mcpStatus: string;
   sources: string[];
+  usage?: MessageUsage;
 };
 
 export const ChatPage = ({
   windowId,
   title = "Owl Bot",
-  welcomeMessage = "Hello How Are You",
+  welcomeMessage = "How can I help you today?",
   showTopBar = true,
   className = "",
 }: ChatPageProps) => {
   const dispatch = useAppDispatch();
   const chatMode = useSelector((state: any) => state.session.windows[windowId]?.chatMode ?? false);
   const activeSessionId = useSelector((state: any) => state.session.windows[windowId]?.activeSessionId ?? null);
+  const sessions: Session[] = useAppSelector((state) => state.session.sessions);
   const cacheMessages = useSelector((state: any) => state.session.windows[windowId]?.cacheChatMessages ?? []);
+  const chatTokens = cacheMessages.reduce((sum: number, m: LLMMessage) => sum + (m.metadata?.usage?.total_tokens ?? 0), 0);
   const streamingSessionIds: string[] = useSelector((state: any) => state.session.streamingSessionIds ?? []);
   const isStreaming = activeSessionId ? streamingSessionIds.includes(activeSessionId) : false;
   const [mcpStatus, setMcpStatus] = useState("");
   const [streamError, setStreamError] = useState<string | null>(null);
+  const [streamErrorCode, setStreamErrorCode] = useState<string | null>(null);
   const [input, setInput] = useState("");
   const [pastedTexts, setPastedTexts] = useState<TextAttachment[]>([]);
 
@@ -119,12 +180,90 @@ export const ChatPage = ({
   const [uploadResults, setUploadResults] = useState<(LLMFileUploadResponse | undefined)[]>([]);
   const [uploadErrors, setUploadErrors] = useState<(string | undefined)[]>([]);
   const [activeTools, setActiveTools] = useState<Record<string, ToolInfo>>({});
+  // Provider agents' hosted browser: pending approvals and the latest screenshot.
+  const [browserApprovals, setBrowserApprovals] = useState<BrowserApproval[]>([]);
+  const [browserShot, setBrowserShot] = useState<string | null>(null);
+  const { providers, selection, setSelection } = useLLMProvider();
+
+  // ── agents ──
+  // /chathome?agent=<id> starts a new chat with that agent; /chathome?session=<id>
+  // opens a specific chat (e.g. a schedule's results).
+  const [searchParams, setSearchParams] = useSearchParams();
+  const urlAgentId = searchParams.get("agent");
+  const urlNativeId = searchParams.get("native");
+  const urlSessionId = searchParams.get("session");
+  // Chats created on this page for an agent, before the sessions list knows.
+  const [agentSessions, setAgentSessions] = useState<Record<string, string>>({});
+  const [nativeSessions, setNativeSessions] = useState<Record<string, string>>({});
+  const activeSession = sessions.find((s) => s.id === activeSessionId);
+  const activeAgentId: string | null =
+    activeSession?.agent_id ?? (activeSessionId ? agentSessions[activeSessionId] : urlAgentId) ?? null;
+  // /chathome?native=<id>: a provider agent (Claude Managed Agents / OpenAI Agents API).
+  const activeNativeId: string | null = activeAgentId ? null :
+    activeSession?.native_agent_id ?? (activeSessionId ? nativeSessions[activeSessionId] : urlNativeId) ?? null;
+  const [agent, setAgent] = useState<Agent | null>(null);
+  const navigate = useNavigate();
+  const [kbMode, setKbMode] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [continueOpen, setContinueOpen] = useState(false);
+  const [explainingKey, setExplainingKey] = useState<string | null>(null);
+  const closePicker = useCallback(() => setPickerOpen(false), []);
   const pageRef = useRef<HTMLDivElement>(null);
   const pinnedToUserRef = useRef(false);
   const lastUserMsgRef = useRef<HTMLDivElement>(null);
   const bottomAnchorRef = useRef<HTMLDivElement>(null);
   const lastScrolledIndex = useRef(-1);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (!urlAgentId && !urlNativeId) return;
+    dispatch(setActiveSession({ windowId, sessionId: null }));
+    dispatch(clearCacheMessage({ windowId }));
+    dispatch(setChatMode({ windowId, chatMode: false }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [urlAgentId, urlNativeId]);
+
+  useEffect(() => {
+    if (!urlSessionId) return;
+    dispatch(setActiveSession({ windowId, sessionId: urlSessionId }));
+    dispatch(setChatMode({ windowId, chatMode: true }));
+    dispatch(loadSessions());
+    setSearchParams({}, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [urlSessionId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!activeAgentId && activeNativeId) {
+      nativeAgentsApi.overview()
+        .then((o) => {
+          const n = o.agents.find((a) => a.id === activeNativeId);
+          if (!cancelled) setAgent(n ? nativeAsAgent(n) : null);
+        })
+        .catch(() => !cancelled && setAgent(null));
+      return () => {
+        cancelled = true;
+      };
+    }
+    if (!activeAgentId) {
+      setAgent(null);
+      return;
+    }
+    agentsApi.getAgent(activeAgentId)
+      .then((a) => !cancelled && setAgent(a))
+      .catch(() => !cancelled && setAgent(null));
+    return () => {
+      cancelled = true;
+    };
+  }, [activeAgentId, activeNativeId]);
+
+  // Grow the composer with its content (CSS max-height caps it, then it scrolls).
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [input]);
   const sessionStreamsRef = useRef<Record<string, SessionStreamState>>({});
   const activeSessionIdRef = useRef<string | null>(activeSessionId);
   const filesRef = useRef<FileAttachment[]>(files);
@@ -237,6 +376,7 @@ export const ChatPage = ({
       role: "assistant",
       content: [{ type: "text", text }, ...extraParts],
       sources: sessionState.sources.length ? sessionState.sources : undefined,
+      ...(sessionState.usage ? { metadata: { usage: sessionState.usage } } : {}),
     } as LLMMessage;
 
     if (!sessionState.botMessageAdded) {
@@ -360,6 +500,7 @@ export const ChatPage = ({
     dispatch(endSessionStream({ sessionId }));
     if (sessionId === activeSessionIdRef.current) {
       setActiveTools({});
+      setBrowserApprovals([]);
       setMcpStatus("");
       pinnedToUserRef.current = false;
     }
@@ -368,28 +509,12 @@ export const ChatPage = ({
   const handleSend = async () => {
     const llmUploadResponse = uploadResults.filter((r): r is LLMFileUploadResponse => !!r);
     if (!input.trim() && !llmUploadResponse.length && !pastedTexts.length) return;
-
-    let sessionId: string | null = activeSessionId;
-    if (!sessionId) {
-      const result = await dispatch(newSession({ windowId }));
-      if (newSession.fulfilled.match(result)) {
-        sessionId = result.payload.session.id;
-      } else {
-        setStreamError("Failed to start a new session");
-        return;
-      }
-    }
-
-    if (streamingSessionIds.includes(sessionId)) return;
-
-    if (!chatMode) {
-      dispatch(setChatMode({ windowId, chatMode: true }));
-      dispatch(updateChatMode({ chatMode: true, currentSessionId: sessionId }));
-    }
+    if (isStreaming) return;
 
     const content: ContentPart[] = [];
     if (input.trim()) {
       content.push({ type: "text", text: input.trim() } as TextContent);
+      if (kbMode) content.push(KB_SEARCH_INSTRUCTION);
     }
     for (const pastedText of pastedTexts) {
       content.push({ type: "text", text: pastedText.content } as TextContent);
@@ -421,6 +546,57 @@ export const ChatPage = ({
       }
     }
 
+    await sendContent(content, () => {
+      setInput("");
+      setPastedTexts([]);
+      setFiles([]);
+      setUploadResults([]);
+      setUploadErrors([]);
+    });
+  };
+
+  // Fetches a knowledge-base document's full text and asks the model to
+  // explain it in detail. Used by source chips and the document picker.
+  const explainDocument = async (key: string) => {
+    if (isStreaming || explainingKey) return;
+    setExplainingKey(key);
+    setStreamError(null);
+    try {
+      const doc = await api.getDocumentContent(key);
+      await sendContent(buildExplainDocumentParts(doc), () => setExplainingKey(null));
+    } catch (err) {
+      setStreamError(`Couldn't open “${displayName(key)}”: ${err instanceof Error ? err.message : "unknown error"}`);
+    } finally {
+      setExplainingKey(null);
+    }
+  };
+
+  // Shared send path: creates the session if needed, shows the user message,
+  // and streams the reply. `onStarted` runs once the request is underway
+  // (so a failed session creation doesn't wipe what the user typed).
+  const sendContent = async (content: ContentPart[], onStarted?: () => void) => {
+    let sessionId: string | null = activeSessionId;
+    const agentIdForSend = activeAgentId ?? undefined;
+    const nativeIdForSend = activeNativeId ?? undefined;
+    if (!sessionId) {
+      const result = await dispatch(newSession({ windowId }));
+      if (newSession.fulfilled.match(result)) {
+        sessionId = result.payload.session.id;
+        if (agentIdForSend) setAgentSessions((m) => ({ ...m, [sessionId as string]: agentIdForSend }));
+        if (nativeIdForSend) setNativeSessions((m) => ({ ...m, [sessionId as string]: nativeIdForSend }));
+      } else {
+        setStreamError("Failed to start a new session");
+        return;
+      }
+    }
+
+    if (streamingSessionIds.includes(sessionId)) return;
+
+    if (!chatMode) {
+      dispatch(setChatMode({ windowId, chatMode: true }));
+      dispatch(updateChatMode({ chatMode: true, currentSessionId: sessionId }));
+    }
+
     const messageToSend: LLMMessage = { type: "message", role: "user", content };
     activeSessionIdRef.current = sessionId
     if (sessionId === activeSessionIdRef.current) {
@@ -428,6 +604,8 @@ export const ChatPage = ({
     }
 
     const sessionIdForStream = sessionId;
+    setBrowserShot(null);
+    setBrowserApprovals([]);
     sessionStreamsRef.current[sessionIdForStream] = {
       buffer: "",
       botMessageAdded: false,
@@ -437,23 +615,21 @@ export const ChatPage = ({
     };
     dispatch(startSessionStream({ sessionId: sessionIdForStream }));
 
-    setInput("");
-    setPastedTexts([]);
-    setFiles([]);
-    setUploadResults([]);
-    setUploadErrors([]);
+    onStarted?.();
     setStreamError(null);
 
     const isVisible = () => sessionIdForStream === activeSessionIdRef.current;
 
     await api.sendMessage(sessionIdForStream, messageToSend, (chunk: StreamChunk) => {
-      console.log(chunk);
       const s = sessionStreamsRef.current[sessionIdForStream];
       if (!s) return;
 
       if (chunk.type === "error") {
         console.error("Stream error:", chunk.code, chunk.message);
-        if (isVisible()) setStreamError(chunk.message ?? "Something went wrong");
+        if (isVisible()) {
+          setStreamError(chunk.message ?? "Something went wrong");
+          setStreamErrorCode(chunk.code ?? null);
+        }
         resetSessionStream(sessionIdForStream);
         return;
       }
@@ -594,6 +770,21 @@ export const ChatPage = ({
         }
       }
 
+      if (chunk.type === "approval_request" && chunk.request && isVisible()) {
+        setBrowserApprovals((list) => [...list, { request: chunk.request as BrowserApprovalRequest }]);
+      }
+      if (chunk.type === "approval_resolved" && chunk.request_id && isVisible()) {
+        setBrowserApprovals((list) => list.map((a) => (a.request.requestId === chunk.request_id ? { ...a, outcome: chunk.outcome } : a)));
+      }
+      if (chunk.type === "browser_screenshot" && chunk.image && isVisible()) {
+        setBrowserShot(chunk.image);
+      }
+
+      if (chunk.type === "usage" && chunk.usage) {
+        s.usage = chunk.usage;
+        if (isVisible() && s.botMessageAdded) updateBotMessage(s, s.buffer);
+      }
+
       if (chunk.type === "session_title") {
         dispatch(loadSessions());
       }
@@ -632,7 +823,7 @@ export const ChatPage = ({
         }
         resetSessionStream(sessionIdForStream);
       }
-    });
+    }, selection, agentIdForSend, nativeIdForSend);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -656,8 +847,20 @@ export const ChatPage = ({
       {showTopBar && (
         <div className="chat_topbar">
           <span className="chat_topbar__brand" title={title}>
-            <OwlMark size={34} />
+            <span className="chat_topbar__logo"><OwlMark size={22} /></span>
+            <span className="chat_topbar__title">{agent ? <><span className="topbar_agent_icon"><AgentAvatar icon={agent.icon} /></span>{agent.name}</> : title}</span>
           </span>
+          {chatTokens > 0 && (
+            <button type="button" className="topbar_usage" onClick={() => navigate("/usage")} title="Tokens used in this chat — open the Usage page">
+              <Zap size={12} /> {formatTokens(chatTokens)} tokens
+            </button>
+          )}
+          {activeSessionId && chatMode && (
+            <button type="button" className="topbar_action" onClick={() => setContinueOpen(true)} title="Continue this chat on your phone">
+              <FontAwesomeIcon icon={faWhatsapp} />
+              <span>Continue in WhatsApp</span>
+            </button>
+          )}
         </div>
       )}
 
@@ -711,6 +914,9 @@ export const ChatPage = ({
                       );
                     }
                     if (m.type === "text") {
+                      if ((m as TextContent).hidden) return null;
+                      const doc = asDocumentPart(m);
+                      if (doc) return <DocumentCard key={`${i}-${j}`} part={doc} />;
                       return (
                         <span key={`${i}-${j}`} className="user_message_text">
                           {(m as TextContent).text}
@@ -747,13 +953,14 @@ export const ChatPage = ({
                     return null;
                   })}
                   {msgSources && msgSources.length > 0 && (
-                    <div className="message_sources">
-                      <span className="sources_label">Sources:</span>
-                      {msgSources.map((f, k) => (
-                        <span key={k} className="source_pill">{f}</span>
-                      ))}
-                    </div>
+                    <SourceChips
+                      sources={msgSources}
+                      onExplain={explainDocument}
+                      loadingKey={explainingKey}
+                      disabled={isStreaming}
+                    />
                   )}
+                  {msg.metadata?.usage && <UsageBadge usage={msg.metadata.usage} />}
                 </div>
               );
             }
@@ -767,7 +974,12 @@ export const ChatPage = ({
                 <path d="M12 8v4M12 16h.01" stroke="#C0392B" strokeWidth="2"
                   strokeLinecap="round" />
               </svg>
-              <span>{streamError}</span>
+              <span>
+                {streamError}
+                {streamErrorCode === "quota_exceeded" && (
+                  <button type="button" className="chat_quota" onClick={() => navigate("/billing")}>Upgrade</button>
+                )}
+              </span>
             </div>
           )}
           {isStreaming && sessionStreamsRef.current[activeSessionId ?? ""]?.buffer === "" && Object.keys(activeTools).length === 0 && (
@@ -798,13 +1010,30 @@ export const ChatPage = ({
             )
           )}
 
+          {browserShot && <BrowserScreenshot image={browserShot} />}
+          {browserApprovals.map((a) => <BrowserApprovalCard key={a.request.requestId} approval={a} />)}
+
           {mcpStatus && <div className="mcp_status">{mcpStatus}</div>}
           <div ref={bottomAnchorRef} />
         </div>
       </div>
 
       <div className={`chat_input_wrapper ${!chatMode ? "centered" : ""}`}>
-        {!chatMode && <div className="chat_welcom_message">{welcomeMessage}</div>}
+        {!chatMode && (
+          agent ? (
+            <div className="welcome">
+              <span className="welcome__logo welcome__logo--agent"><AgentAvatar icon={agent.icon} /></span>
+              <h1 className="welcome__title">{agent.name}</h1>
+              <p className="welcome__subtitle">{agent.description || "Ask me anything."}</p>
+            </div>
+          ) : (
+            <div className="welcome">
+              <span className="welcome__logo"><OwlMark size={30} /></span>
+              <h1 className="welcome__title">{greeting()}</h1>
+              <p className="welcome__subtitle">{welcomeMessage}</p>
+            </div>
+          )
+        )}
         <div className="chat_input">
           {files.length > 0 && (
             <div className="attachment_pills">
@@ -852,45 +1081,131 @@ export const ChatPage = ({
             onKeyDown={handleKeyDown}
             onPaste={handlePaste}
             disabled={isStreaming}
+            rows={1}
+            placeholder={kbMode ? "Ask about your documents…" : `Message ${agent?.name ?? title}…`}
+            aria-label="Message"
           />
 
           <div className="chat_input_bottom">
             <div className="chat_input_bottom__dropdown_options">
-              <label style={{ cursor: "pointer" }}>
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"
-                  viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                  strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M12 5v14" /><path d="M5 12h14" />
-                </svg>
-                <input
-                  type="file"
-                  style={{ display: "none" }}
-                  accept="image/*,.docx,.pdf,.txt,.csv,.json"
-                  multiple
-                  onChange={handleFileSelect}
+              <AttachMenu
+                onFilesSelected={handleFileSelect}
+                onExplainDocument={() => setPickerOpen(true)}
+                onManageKnowledgeBase={() => navigate("/file_explorer")}
+                kbMode={kbMode}
+                onToggleKbMode={() => {
+                  setKbMode((v) => !v);
+                  textareaRef.current?.focus();
+                }}
+                disabled={isStreaming}
+              />
+              {kbMode && (
+                <span className="mode_chip">
+                  <Search size={13} />
+                  Knowledge base
+                  <button type="button" onClick={() => setKbMode(false)} aria-label="Turn off knowledge base search">
+                    <X size={12} />
+                  </button>
+                </span>
+              )}
+              {agent ? (
+                <span className="mode_chip agent_chip" title={`Chatting with ${agent.name} · ${agent.model ?? "default model"}`}>
+                  <span className="agent_chip__icon"><AgentAvatar icon={agent.icon} /></span> {agent.name}
+                </span>
+              ) : (
+                <ModelSelector
+                  providers={providers}
+                  value={selection}
+                  onChange={setSelection}
+                  disabled={isStreaming}
                 />
-              </label>
+              )}
             </div>
 
             <div className="chat_input_bottom__functional_options">
               {isStreaming ? (
-                <button className="stop_btn" onClick={cancelStream}>
-                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-                    <rect x="5" y="5" width="14" height="14" rx="2" fill="white" />
-                  </svg>
+                <button type="button" className="stop_btn" onClick={cancelStream} aria-label="Stop generating" title="Stop">
+                  <Square size={12} fill="currentColor" strokeWidth={0} />
                 </button>
               ) : (
-                <button className="send_btn" onClick={handleSend}>
-                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-                    <path d="M12 19V5M5 12l7-7 7 7" stroke="white" strokeWidth="2.2"
-                      strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
+                <button
+                  type="button"
+                  className="send_btn"
+                  onClick={handleSend}
+                  disabled={!input.trim() && !uploadResults.some(Boolean) && !pastedTexts.length}
+                  aria-label="Send message"
+                  title="Send"
+                >
+                  <ArrowUp size={18} strokeWidth={2.4} />
                 </button>
               )}
             </div>
           </div>
         </div>
+
+        {!chatMode && agent && agent.starters.length > 0 && (
+          <div className="suggestions suggestions--starters">
+            {agent.starters.map((starter) => (
+              <button key={starter} type="button" className="suggestion" onClick={() => sendContent([{ type: "text", text: starter } as TextContent])}>
+                <span><strong>{starter}</strong></span>
+              </button>
+            ))}
+          </div>
+        )}
+
+        {!chatMode && !agent && (
+          <div className="suggestions">
+            <button type="button" className="suggestion" onClick={() => setPickerOpen(true)}>
+              <BookOpenText size={16} />
+              <span>
+                <strong>Explain a document</strong>
+                <small>Detailed walkthrough of a file in your knowledge base</small>
+              </span>
+            </button>
+            <button
+              type="button"
+              className="suggestion"
+              onClick={() => {
+                setKbMode(true);
+                textareaRef.current?.focus();
+              }}
+            >
+              <Search size={16} />
+              <span>
+                <strong>Ask your knowledge base</strong>
+                <small>Answers grounded in your own documents</small>
+              </span>
+            </button>
+            <button
+              type="button"
+              className="suggestion"
+              onClick={() => {
+                setInput("Explain how attention works in transformers, step by step.");
+                textareaRef.current?.focus();
+              }}
+            >
+              <Lightbulb size={16} />
+              <span>
+                <strong>Learn a concept</strong>
+                <small>e.g. how attention works in transformers</small>
+              </span>
+            </button>
+          </div>
+        )}
+
+        {chatMode && <p className="composer_disclaimer">AI can make mistakes. Check important information.</p>}
       </div>
+
+      {continueOpen && activeSessionId && (
+        <WhatsAppConnect mode="continue" sessionId={activeSessionId} onClose={() => setContinueOpen(false)} />
+      )}
+
+      {pickerOpen && (
+        <DocumentPicker
+          onClose={closePicker}
+          onPick={(doc: KnowledgeDocument) => explainDocument(doc.key)}
+        />
+      )}
     </div>
   );
 };

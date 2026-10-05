@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import { GlowingAiSparkle } from './ai_icon';
-import './storage.css';
+import { useNavigate } from 'react-router-dom';
+import { AiAssistantIcon } from '@/features/storage/components/ai_icon';
 import {
+  ArrowLeft,
   Search,
   Sparkles,
   SlidersHorizontal,
@@ -22,14 +23,14 @@ import {
   Trash2,
   Check,
 } from 'lucide-react';
-import { ChatPage } from '../chat/chat';
+import { ChatPage } from '@/features/chat/components/chat_page';
 import {
   useDeleteFilesMutation,
   useListFilesQuery,
   useUploadFilesMutation,
-} from './storage_api';
-import { useAppDispatch, useAppSelector } from '../../store/store';
-import { clearStorageSearchQuery, setStorageSearchQuery } from './storage_search_slice';
+} from '@/features/storage/api/storage_api';
+import { useAppDispatch, useAppSelector } from '@/app/store';
+import { clearStorageSearchQuery, setStorageSearchQuery } from '@/features/storage/state/storage_search_slice';
 
 // How long to wait after the user stops typing before the search actually
 // fires — without this, every keystroke would dispatch a redux update and
@@ -129,6 +130,7 @@ function ConfirmDialog({
 }
 
 export function S3FolderBrowser() {
+  const navigate = useNavigate();
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [isUploadMenuOpen, setIsUploadMenuOpen] = useState(false);
 
@@ -431,31 +433,19 @@ export function S3FolderBrowser() {
       )}
 
       <div className="storage-main">
-        <div className="storage-top-bar">
-          <div className="storage-top-bar__search_bar">
-            <div className="search-icon-group">
-              <Search size={20} strokeWidth={2} />
-              <Sparkles size={10} strokeWidth={2.5} className="sparkle-icon" />
-            </div>
-            <input
-              className="search-input"
-              type="text"
-              placeholder="Search your files"
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-            />
-            {searchInput && (
-              <button
-                type="button"
-                className="search-input__clear"
-                aria-label="Clear search"
-                onClick={() => setSearchInput('')}
-              >
-                <X size={14} />
-              </button>
-            )}
+        <header className="storage-header">
+          <button
+            type="button"
+            className="icon-button storage-header__back"
+            aria-label="Back to chat"
+            onClick={() => navigate('/chathome')}
+          >
+            <ArrowLeft size={20} />
+          </button>
+          <div className="storage-header__titles">
+            <div className="storage-heading truncate">Knowledge base</div>
+            <div className="storage-subheading truncate">Files your AI assistant can search and cite</div>
           </div>
-          <div className="storage-top-bar__actions"></div>
           <div className="action-icons">
             <div className="upload-menu" ref={uploadMenuRef}>
               <button
@@ -528,9 +518,34 @@ export function S3FolderBrowser() {
               <SlidersHorizontal size={20} />
             </button>
           </div>
-        </div>
+        </header>
 
-        <div className="storage-heading">Welcome to Drive</div>
+        <div className="storage-top-bar">
+          <div className="storage-top-bar__search_bar">
+            <div className="search-icon-group">
+              <Search size={20} strokeWidth={2} />
+              <Sparkles size={10} strokeWidth={2.5} className="sparkle-icon" />
+            </div>
+            <input
+              className="search-input"
+              type="search"
+              enterKeyHint="search"
+              placeholder="Search your files"
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+            />
+            {searchInput && (
+              <button
+                type="button"
+                className="search-input__clear"
+                aria-label="Clear search"
+                onClick={() => setSearchInput('')}
+              >
+                <X size={14} />
+              </button>
+            )}
+          </div>
+        </div>
 
         <div className="storage-file-list-container">
           {/* Selection toolbar replaces the header row while something is selected */}
@@ -652,7 +667,11 @@ export function S3FolderBrowser() {
                     </div>
                     <div className="cell name-cell" onClick={() => handleOpenFile(file)}>
                       <Icon size={18} className={className} />
-                      <span className="truncate">{file.name}</span>
+                      <div className="name-cell__text">
+                        <span className="truncate">{file.name}</span>
+                        {/* Shown only once the Date column is hidden on narrow widths */}
+                        <span className="name-cell__meta truncate">{file.lastModified ?? '—'}</span>
+                      </div>
                     </div>
                     <div className="cell date-cell">
                       <span className="truncate text-secondary">{file.lastModified ?? '—'}</span>
@@ -763,8 +782,9 @@ export function S3FolderBrowser() {
         )}
 
         {!isChatOpen && (
-          <button type="button" className="ai-icon" aria-label="Open AI assistant" onClick={() => setIsChatOpen(true)}>
-            <GlowingAiSparkle />
+          <button type="button" className="ai-icon" aria-label="Ask AI about your files" onClick={() => setIsChatOpen(true)}>
+            <AiAssistantIcon />
+            <span className="ai-icon__label">Ask AI</span>
           </button>
         )}
       </div>

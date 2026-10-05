@@ -1,6 +1,6 @@
 import { createSlice, createAsyncThunk, type PayloadAction } from "@reduxjs/toolkit"
-import { api } from "./api"
-import type { ContentPart, LLMMessage, Session } from "../../types"
+import { api } from "@/features/chat/api/chat_api"
+import type { ContentPart, LLMMessage, Session } from "@/shared/types"
 
 
 
@@ -202,6 +202,9 @@ const sessionSlice = createSlice({
             if (!state.streamingSessionIds.includes(sessionId)) {
                 state.streamingSessionIds.push(sessionId);
             }
+            // A new message = latest activity: move this chat to the top of Recents.
+            const session = state.sessions.find((s) => s.id === sessionId);
+            if (session) session.updated_at = new Date().toISOString();
         },
         endSessionStream(state, action: PayloadAction<{ sessionId: string }>) {
             const { sessionId } = action.payload;
@@ -252,7 +255,7 @@ const sessionSlice = createSlice({
                 win.activeSessionId = session.id;
                 sessionStorage.setItem(`active_session_id_${windowId}`, session.id);
                 if (!state.sessions.some(s => s.id === session.id)) {
-                    state.sessions.push(session);
+                    state.sessions.unshift(session);
                 }
             })
             .addCase(deleteSession.fulfilled, (state, action) => {
@@ -312,6 +315,7 @@ const sessionSlice = createSlice({
                                 ...((message as any).sources || (message as any).source_file
                                     ? { sources: (message as any).sources ?? (message as any).source_file }
                                     : {}),
+                                ...(message.metadata?.usage ? { metadata: { usage: message.metadata.usage } } : {}),
                             } as LLMMessage;
                         case "tool_call":
                             return {

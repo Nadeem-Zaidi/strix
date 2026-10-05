@@ -42,10 +42,25 @@ export interface DeleteFilesResponse {
     deleted: number;
 }
 
+// Storage routes (list_files/upload/delete) are mounted at the app root
+// (see gateway/vanilla_gateway.ts: app.use("/", storageRoutes.getRouter())),
+// not under "/api" like the chat routes — chat/api.ts already handles this
+// correctly for the same routes via its storageBaseUrl getter. This was
+// hardcoded to "http://localhost:3000" instead, which only ever worked when
+// the browser itself was on the same machine as the backend — on any other
+// device (a phone hitting the deployed server) that resolves to the
+// device's own localhost, where nothing is listening, so every request
+// here failed outright ("Couldn't load files"). Deriving it from
+// VITE_API_URL the same way fixes both: in production VITE_API_URL is the
+// same-origin "/api", stripped down to "" (relative to whatever host
+// actually loaded the page); in local dev it's "http://localhost:3000/api",
+// stripped down to "http://localhost:3000".
+const STORAGE_BASE_URL = (import.meta.env.VITE_API_URL as string ?? "").replace(/\/api\/?$/, "");
+
 export const storageApi = createApi({
     reducerPath: "storageApi",
     baseQuery: fetchBaseQuery({
-        baseUrl: "http://localhost:3000",
+        baseUrl: STORAGE_BASE_URL,
         prepareHeaders: async ( headers) => {
             const user = await waitForAuthUser();
             if (user) {

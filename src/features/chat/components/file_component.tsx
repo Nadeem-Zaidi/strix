@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { FileAttachment } from "../../types";
+import type { FileAttachment } from "@/shared/types";
 
 export interface FileComponentProps {
   file: FileAttachment;

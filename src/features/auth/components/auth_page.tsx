@@ -8,15 +8,14 @@ import {
 } from 'firebase/auth';
 
 import { useDispatch, useSelector } from 'react-redux';
-import owlLogo from './owl_agent.png';
-import './auth_main.css';
+import owlLogo from '@/features/auth/assets/owl_agent.png';
 import { useNavigate } from 'react-router-dom';
-import type { AppDispatch, RootState } from '../../store/store';
-import { auth, db } from '../../shared/firebase_config';
-import { authStart, authSuccess } from './authentication_slice';
-import { Firebase_Storage } from './firebase_storage';
-import { User } from './user';
-import { api } from './helper_api_functions';
+import type { AppDispatch, RootState } from '@/app/store';
+import { auth, db } from '@/shared/lib/firebase';
+import { authStart, authSuccess } from '@/features/auth/state/auth_slice';
+import { Firebase_Storage } from '@/features/auth/api/profile_store';
+import { User } from '@/features/auth/model/user';
+import { api } from '@/features/auth/api/auth_api';
 
 
 declare global {
@@ -42,6 +41,20 @@ export const AuthMain = () => {
     const otpRefs = useRef<(HTMLInputElement | null)[]>([]);
     const confirmationRef = useRef<any>(null);
     const navigate = useNavigate();
+
+    // Profiles live at users/{uid}. Accounts created before that were saved
+    // under a random id; copy such a profile to users/{uid} once (found by email).
+    const loadProfile = async (uid: string, email: string | null): Promise<User | null> => {
+        const own = await database.getById(uid);
+        if (own) return own;
+        if (!email) return null;
+        const legacy = (await database.getByField("email", email)).find((u) => u.uid === uid || !u.uid);
+        if (!legacy) return null;
+        const migrated = new User(uid, legacy.phone, legacy.name, legacy.email, legacy.folder, uid, legacy.createdAt);
+        await database.setOne(uid, migrated);
+        return migrated;
+    };
+
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
             if (firebaseUser) {
@@ -59,27 +72,18 @@ export const AuthMain = () => {
                     })
                 );
 
-                const existing = await database.getByField("email", firebaseUser.email);
-
-
-                if (existing.length && existing[0].email && existing[0].phone) {
-
-                    navigate('/chathome');
-                } else if (existing.length && existing[0].email && !existing[0].phone) {
-                    await database.deleteOne(firebaseUser.uid);
-                    await auth.signOut();
-                    setStep('email');
-                } else {
-                    // Firebase session exists (persisted across the refresh)
-                    // but there's no Firestore profile yet — this is the
-                    // mid-signup state: Google sign-in (or a phone-link
-                    // already in progress) succeeded, but the phone step
-                    // was never completed. This used to reset to 'email',
-                    // but isAuthenticated is already true at this point and
-                    // the 'email' step's UI is gated on !isAuthenticated —
-                    // so nothing rendered at all, which is the "stuck on
-                    // refresh" blank screen. Send them back to the phone
-                    // step instead, which isn't gated the same way.
+                try {
+                    const profile = await loadProfile(firebaseUser.uid, firebaseUser.email);
+                    if (profile && firebaseUser.phoneNumber) {
+                        navigate('/chathome');
+                    } else {
+                        // Signed in with Google but the phone step isn't done yet
+                        // (the server requires a verified phone number).
+                        setStep("phone");
+                    }
+                } catch (err) {
+                    console.error("Couldn't load the profile:", err);
+                    setError("Couldn't load your account. Please try again.");
                     setStep("phone");
                 }
             }
@@ -154,34 +158,37 @@ export const AuthMain = () => {
 
         try {
             await confirmationRef.current.confirm(code);
+        } catch {
+            setError('Invalid OTP.');
+            setLoading(false);
+            return;
+        }
+
+        try {
             const currentuser = auth.currentUser;
-            if (!currentuser) {
-                throw new Error("Error in creating user")
-            }
-            const createFolder = await api.createFolder(currentuser.uid.toString().trim())
-            if (!createFolder.success) {
-                throw new Error("Error in creating work space")
-            }
-            const createFileInFolder = await api.createFolder(`${currentuser.uid.toString().trim()}/strix.st`)
-            if (!createFileInFolder.success) {
-                throw new Error("Error in creating work space ")
-            }
-            const existing = await database.getByField("email", currentuser.email);
-            if (!existing.length) {
-                const newUser = new User(
-                    currentuser.uid,
+            if (!currentuser) throw new Error("You were signed out — please sign in again");
+            // New token that includes the verified phone number (the server checks it).
+            await currentuser.getIdToken(true);
+
+            const uid = currentuser.uid.toString().trim();
+            const existing = await loadProfile(uid, currentuser.email);
+            if (!existing) {
+                const createFolder = await api.createFolder(uid);
+                if (!createFolder.success) throw new Error("Couldn't create your workspace");
+                const createFileInFolder = await api.createFolder(`${uid}/strix.st`);
+                if (!createFileInFolder.success) throw new Error("Couldn't create your workspace");
+                await database.setOne(uid, new User(
+                    uid,
                     currentuser.phoneNumber ?? '',
                     currentuser.displayName ?? '',
                     currentuser.email ?? '',
                     createFolder.folder,
-                    currentuser.uid,
-                );
-                await database.createOne(newUser);
-
-                navigate("/chathome")
+                    uid,
+                ));
             }
-        } catch {
-            setError('Invalid OTP.');
+            navigate("/chathome");
+        } catch (err) {
+            setError(err instanceof Error ? err.message : "Couldn't finish setting up your account.");
         } finally {
             setLoading(false);
         }
@@ -190,10 +197,9 @@ export const AuthMain = () => {
     const handleGoogle = async () => {
         try {
             const provider = new GoogleAuthProvider();
-            await signInWithPopup(auth, provider);
-            const currentUserEmail = auth.currentUser?.email;
-            const u = await database.getByField("email", currentUserEmail);
-            if (!u.length) {
+            const result = await signInWithPopup(auth, provider);
+            const profile = await loadProfile(result.user.uid, result.user.email);
+            if (!profile || !result.user.phoneNumber) {
                 setStep('phone')
             }
         } catch {

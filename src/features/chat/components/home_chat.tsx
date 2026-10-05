@@ -1,6 +1,5 @@
-import "./chat.css";
-import { SideDrawer } from "./sidebar";
-import { ChatPage } from "./chat";
+import { SideDrawer } from "@/features/chat/components/sidebar";
+import { ChatPage } from "@/features/chat/components/chat_page";
 const HOME_CHAT_WINDOW_ID = "chat-page";
 
 export const HomeChat = () => {
@@ -8,7 +7,7 @@ export const HomeChat = () => {
     <div className="chat_main">
       <div className="chat_sections">
         <SideDrawer windowId={HOME_CHAT_WINDOW_ID} />
-        <ChatPage windowId={HOME_CHAT_WINDOW_ID} title="Owl Bot" welcomeMessage="Hello How Are You" />
+        <ChatPage windowId={HOME_CHAT_WINDOW_ID} title="Owl Bot" welcomeMessage="How can I help you today?" />
       </div>
     </div>
   );

@@ -1,0 +1,139 @@
+/* ─────────────────────────────────────────────────────────────
+   Sand theme — built around #D7C2AE with a deep-brown accent.
+   Loaded after every other stylesheet; `:root:root` outranks the
+   per-feature :root blocks (chat.css, chat_modern.css, storage.css)
+   whatever order they load in. Remove the import in main.tsx to go
+   back to the original look.
+
+   Contrast (WCAG): text on surfaces ≥ 13:1, secondary text ≥ 6:1,
+   sidebar secondary ≥ 4.7:1, white on accent 9:1.
+   ───────────────────────────────────────────────────────────── */
+:root:root {
+    --sand: #d7c2ae; /* the brand colour */
+    --sand-hover: #cbb39c;
+    --sand-active: #c4aa92;
+    --brown: #4a3530; /* the dark edge */
+    --sidebar-text-sec: #4f3b30;
+
+    /* chat.css + chat_modern.css */
+    --bg-app: #f6efe7;
+    --bg-surface: #fffcf8;
+    --bg-input: #fffcf8;
+    --bg-hover: #eee3d7;
+    --bg-active: #e6d8c8;
+    --bg-subtle: #f3eadf;
+    --bg-code: #f6efe7;
+    --bg-code-hdr: #ece1d4;
+
+    --border: #e4d6c6;
+    --border-soft: #ece1d4;
+    --border-strong: #d7c2ae;
+
+    --text-pri: #2e211c;
+    --text-sec: #6a5446;
+    --text-ter: #9a8474;
+
+    --accent: #5b4239;
+    --accent-hover: #47332c;
+    --accent-soft: #f1e6da;
+    --accent-ring: rgba(91, 66, 57, 0.2);
+    --accent-ink: #fffcf8;
+    --accent-secondary: #d7c2ae;
+
+    --tool-purple-bg: #f1e6da;
+    --tool-purple-fg: #5b4239;
+
+    --shadow-xs: 0 1px 2px rgba(46, 33, 28, 0.06);
+    --shadow-sm: 0 1px 3px rgba(46, 33, 28, 0.07), 0 1px 2px rgba(46, 33, 28, 0.05);
+    --shadow-md: 0 8px 24px -6px rgba(46, 33, 28, 0.14), 0 2px 6px rgba(46, 33, 28, 0.06);
+    --shadow-lg: 0 24px 60px -12px rgba(46, 33, 28, 0.28);
+
+    /* storage.css (knowledge base) */
+    --bg: #f6efe7;
+    --surface: #fffcf8;
+    --text-primary: #2e211c;
+    --text-secondary: #6a5446;
+    --text-tertiary: #9a8474;
+
+    color-scheme: light;
+}
+
+body {
+    background: var(--bg-app);
+    color: var(--text-pri);
+}
+
+/* ── Sidebar: the sand panel with the brown edge, like the swatch ── */
+.sidebar {
+    background: var(--sand);
+    border-right: 3px solid var(--brown);
+    --text-sec: var(--sidebar-text-sec);
+    --text-ter: var(--sidebar-text-sec);
+    --border: rgba(74, 53, 48, 0.18);
+    --border-soft: rgba(74, 53, 48, 0.14);
+    --bg-hover: var(--sand-hover);
+    --bg-active: var(--sand-active);
+}
+
+/* ── Spots that had the old indigo hard-coded ── */
+.user_avatar {
+    background: linear-gradient(135deg, #6f5246, var(--brown));
+}
+
+.welcome__logo {
+    background: linear-gradient(145deg, #f1e6da, #e9dccd);
+    box-shadow: inset 0 0 0 1px rgba(91, 66, 57, 0.14);
+}
+
+.mode_chip button:hover {
+    background: rgba(91, 66, 57, 0.12);
+}
+
+.source_chip:hover:not(:disabled) {
+    border-color: rgba(91, 66, 57, 0.4);
+}
+
+.send_btn {
+    box-shadow: 0 1px 3px rgba(74, 53, 48, 0.3);
+}
+
+.send_btn:hover {
+    box-shadow: 0 2px 8px rgba(74, 53, 48, 0.35);
+}
+
+.agent-mark {
+    filter: drop-shadow(0 2px 4px rgba(74, 53, 48, 0.22));
+}
+
+.btn--primary,
+.upload-btn {
+    background: linear-gradient(135deg, var(--accent), #73564a);
+    box-shadow: 0 2px 8px rgba(74, 53, 48, 0.28);
+}
+
+.btn--primary:hover:not(:disabled),
+.upload-btn:hover {
+    box-shadow: 0 4px 14px rgba(74, 53, 48, 0.36);
+}
+
+.ai-icon {
+    background: linear-gradient(135deg, #5b4239 0%, #3e2c26 100%);
+    box-shadow: 0 10px 24px -6px rgba(74, 53, 48, 0.5);
+}
+
+.ai-icon:hover {
+    box-shadow: 0 14px 30px -6px rgba(74, 53, 48, 0.55);
+}
+
+::selection {
+    background: rgba(215, 194, 174, 0.6);
+}
+
+/* Translucent white bars → warm cream so they match the page. */
+.chat_topbar {
+    background: rgba(255, 252, 248, 0.88);
+}
+
+.ag_savebar {
+    background: rgba(255, 252, 248, 0.96);
+}

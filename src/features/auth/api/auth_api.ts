@@ -1,8 +1,8 @@
 import { onAuthStateChanged } from "firebase/auth";
-import { auth } from "../../shared/firebase_config";
-import type { FilesResult, Message, Session } from "../../types";
+import { auth } from "@/shared/lib/firebase";
+import type { FilesResult, Message, Session } from "@/shared/types";
 
-const BASE = "http://localhost:3000";
+const BASE = import.meta.env.VITE_API_URL?.replace(/\/api\/?$/, "") || "http://localhost:3000";
 
 export const getAuthHeader = async () => {
   const user = auth.currentUser ?? await new Promise<any>((resolve) => {
@@ -29,7 +29,6 @@ export const api = {
     if (!res.ok) throw new Error("Failed to fetch sessions");
 
     const result = await res.json();
-    console.log(result);
     return result;
   },
 
@@ -44,16 +43,12 @@ export const api = {
 
   getMessages: async (sessionId: string): Promise<Message[]> => {
     try {
-      console.log("before auth");
       const headers = await getAuthHeader();
-      console.log(headers)
-      console.log("after auth")
       const res = await fetch(`${BASE}/sessions/${sessionId}/messages`, {
         headers,
       });
       if (!res.ok) throw new Error("Failed to fetch messages");
       const rows = await res.json();
-      console.log(rows);
       return rows
         .filter((m: any) => m.role === "user" || m.role === "assistant")
         .map((m: any) => ({
@@ -148,7 +143,6 @@ export const api = {
       files.forEach(file => formData.append('files', file));
 
       formData.append('prefix', prefix);
-      console.log([...formData.entries()])
       const res = await fetch(`${BASE}/upload`, {
         method: 'POST',
         headers: {

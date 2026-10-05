@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { api } from "./api";
-import type { CodeInterpreterFileRef } from "../../types";
+import { api } from "@/features/chat/api/chat_api";
+import type { CodeInterpreterFileRef } from "@/shared/types";
 
 export interface CodeInterpreterCardProps {
   code: string;

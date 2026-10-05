@@ -1,5 +1,5 @@
 import { Timestamp } from "firebase/firestore";
-import type { Mappable } from "../../types";
+import type { Mappable } from "@/shared/types";
 
 export class User implements Mappable {
     id: string;
@@ -27,8 +27,8 @@ export class User implements Mappable {
             map["phone"],
             map["name"],
             map["email"],
-            map["uid"],
             map["folder"],
+            map["uid"],
             map["createdAt"] instanceof Timestamp
                 ? map["createdAt"]
                 : Timestamp.now()

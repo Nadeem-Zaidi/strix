@@ -1,5 +1,5 @@
-import type { LLMFileUploadResponse, LLMMessage, Session } from "../../types";
-import { BaseApi } from "./base_fetch";
+import type { DocumentContent, KnowledgeDocument, LLMFileUploadResponse, LLMMessage, MessageUsage, Session, WhatsAppLinkCode, WhatsAppStatus } from "@/shared/types";
+import { BaseApi } from "@/shared/api/base_fetch";
 
 export type StreamChunk = {
     type:
@@ -18,6 +18,7 @@ export type StreamChunk = {
         | "code_interpreter_call_status"     // status update: "in_progress" | "interpreting" | "completed" | "failed"
         | "code_interpreter_file"            // a file (chart, csv, etc.) the code interpreter generated
         | "session_title"
+        | "usage"                   // token totals for the turn, sent just before it ends
         | "error"
         | "cancelled"               // stream aborted via AbortController
         | "done"
@@ -38,6 +39,29 @@ export type StreamChunk = {
     file_id?: string;           // code_interpreter_file
     container_id?: string;      // code_interpreter_file
     filename?: string;          // code_interpreter_file
+    usage?: MessageUsage;       // usage
+    request?: unknown;          // approval_request (provider agents' browser)
+    request_id?: string;        // approval_resolved
+    outcome?: string;           // approval_resolved
+    image?: string;             // browser_screenshot (data URL)
+};
+
+export type LLMProviderOption = {
+    id: string;            // "openai" | "anthropic" — sent back as `provider` on /chat_stream
+    label: string;         // display name, e.g. "Claude"
+    defaultModel: string;  // e.g. "claude-opus-5-5"
+    models: { id: string; label: string }[]; // selectable models; id is sent back as `model`
+};
+
+// Away message for the bot's number (self-chat mode).
+export type WhatsAppAway = {
+    available: boolean;
+    enabled: boolean;
+    message: string;
+    cooldown_minutes: number;
+    until: string | null;
+    updated_at: string | null;
+    recipients?: { total: number; recent: { number: string | null; name: string | null; repliedAt: string; count: number }[] };
 };
 
 class Api extends BaseApi {
@@ -67,17 +91,26 @@ class Api extends BaseApi {
         return await this.post<Session>("/new_session");
     }
 
+    async getProviders() {
+        return await this.get<{ providers: LLMProviderOption[]; defaultProvider: string }>("/providers");
+    }
+
     async sendMessage(
         sessionId: string,
         message: LLMMessage,
-        onChunk: (chunk: StreamChunk) => void
+        onChunk: (chunk: StreamChunk) => void,
+        selection?: { provider: string; model: string },
+        // Starts (or continues) a chat with this agent; the backend attaches it to the session.
+        agentId?: string,
+        // Same, for a provider agent (Claude Managed Agents / OpenAI Agents API).
+        nativeAgentId?: string
     ) {
         this.abortController = new AbortController();
 
         try {
             await this.stream(
                 "/chat_stream",
-                { currentSessionId: sessionId, llmMessage: message },
+                { currentSessionId: sessionId, llmMessage: message, provider: selection?.provider, model: selection?.model, agentId, nativeAgentId },
                 (_event, data) => onChunk(data as StreamChunk),
                 this.abortController.signal
             );
@@ -108,6 +141,67 @@ class Api extends BaseApi {
     // that VITE_API_URL carries for the chat endpoints.
     private get storageBaseUrl(): string {
         return this.baseUrl.replace(/\/api\/?$/, "");
+    }
+
+    // ── WhatsApp ──
+    async getWhatsAppAway(): Promise<WhatsAppAway> {
+        return this.get<WhatsAppAway>("/whatsapp/away");
+    }
+
+    async saveWhatsAppAway(body: { enabled: boolean; message: string; cooldown_minutes: number; until: string | null }): Promise<WhatsAppAway> {
+        return this.put<WhatsAppAway>("/whatsapp/away", body);
+    }
+
+    async getWhatsAppStatus(): Promise<WhatsAppStatus> {
+        return this.get<WhatsAppStatus>("/whatsapp/status");
+    }
+
+    // One-time code to link this account's WhatsApp number; with a sessionId
+    // the phone also picks up that chat.
+    async createWhatsAppLinkCode(sessionId?: string | null): Promise<WhatsAppLinkCode> {
+        return this.post<WhatsAppLinkCode>("/whatsapp/link_code", sessionId ? { sessionId } : {});
+    }
+
+    // Moves a chat to an already-linked phone; returns the link to open WhatsApp.
+    async continueInWhatsApp(sessionId: string): Promise<{ waLink: string }> {
+        return this.post<{ waLink: string }>("/whatsapp/continue", { sessionId });
+    }
+
+    // Starts pairing the bot's own number; the QR then shows up in getWhatsAppStatus().
+    async pairWhatsAppBot(): Promise<void> {
+        await this.post("/whatsapp/bot/pair");
+    }
+
+    async unlinkWhatsApp(): Promise<void> {
+        await this.delete("/whatsapp/link");
+    }
+
+    // Documents indexed in the user's knowledge base (one entry per file).
+    async getDocuments(): Promise<KnowledgeDocument[]> {
+        const data = await this.storageGet<{ documents: KnowledgeDocument[] }>("/documents");
+        return data.documents;
+    }
+
+    // Full text of one indexed document; `key` is a RAG source_file or filename.
+    async getDocumentContent(key: string): Promise<DocumentContent> {
+        return this.storageGet<DocumentContent>(`/document_content?key=${encodeURIComponent(key)}`);
+    }
+
+    private async storageGet<T>(path: string): Promise<T> {
+        const headers = await this.getHeader();
+        const response = await fetch(`${this.storageBaseUrl}${path}`, {
+            headers: { Authorization: headers.Authorization },
+        });
+        if (!response.ok) {
+            let message = `Request failed (${response.status})`;
+            try {
+                message = (await response.json()).message ?? message;
+            } catch {
+                // non-JSON error body — keep the status message
+            }
+            throw new Error(message);
+        }
+        return response.json() as Promise<T>;
     }
 
     async uploadFile(file: File): Promise<LLMFileUploadResponse> {

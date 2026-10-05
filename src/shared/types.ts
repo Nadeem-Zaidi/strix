@@ -55,6 +55,12 @@ export type Session={
   id:string
   userid:string
   title:string
+  source?:"web"|"whatsapp"
+  agent_id?:string|null
+  agent_icon?:string|null
+  agent_name?:string|null
+  native_agent_id?:string|null
+  native_provider?:"anthropic"|"openai"|null
   model?:string|null
   created_at:string
   updated_at:string
@@ -112,6 +118,29 @@ export type Action = { label: string; onClick: () => void; danger?: boolean };
 export type TextContent = {
     type: string;
     text: string;
+    // Set when this text part carries a whole knowledge-base document (the
+    // "explain this document" flow) — rendered as a compact card, not prose.
+    documentName?: string;
+    documentKey?: string;
+    truncated?: boolean;
+    totalChars?: number;
+    // Instructions for the model that shouldn't show in the chat bubble.
+    hidden?: boolean;
+};
+
+export type KnowledgeDocument = {
+    key: string;   // S3 key / RAG source_file
+    name: string;
+    chunks: number;
+    updatedAt: string;
+};
+
+export type DocumentContent = {
+    key: string;
+    name: string;
+    content: string;
+    truncated: boolean;
+    totalChars: number;
 };
 
 export type ToolCall = {
@@ -217,6 +246,19 @@ export type LLMMessage = {
     error?:string
     cancelled?:boolean
     source_file?:string[]
+    metadata?: { usage?: MessageUsage; [key: string]: unknown }
+}
+
+// Token usage of one chat turn (all model calls, incl. tool loops) — stored on the turn's final reply.
+export type MessageUsage = {
+    input_tokens: number;
+    output_tokens: number;
+    cache_read_tokens: number;
+    cache_write_tokens: number;
+    total_tokens: number;
+    requests: number;
+    model?: string;
+    provider?: string;
 }
 
 export type ImageAttachment= {
@@ -249,3 +291,21 @@ export type LLMFileUploadResponse={
     openaiFileId?:string
 
 }
+
+export type WhatsAppStatus = {
+    enabled: boolean;          // server has WHATSAPP_ENABLED=true
+    botConnected: boolean;     // bot number is online
+    botNumber?: string;        // e.g. "919876543210"
+    botState?: "starting" | "awaiting_qr" | "connected" | "disconnected" | "logged_out";
+    canPair?: boolean;         // this user may pair the bot's number
+    awayAvailable?: boolean;   // away message can be set (bot runs on your own number)
+    pairingQr?: string;        // raw QR text while the bot waits to be paired
+    link: { number: string; displayName: string | null; linkedAt: string } | null;
+};
+
+export type WhatsAppLinkCode = {
+    code: string;
+    expiresAt: string;
+    botNumber: string;
+    waLink: string;            // https://wa.me/<bot>?text=link%20OWL-XXXXXX
+};

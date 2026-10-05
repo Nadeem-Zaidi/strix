@@ -1,11 +1,11 @@
 import { configureStore } from "@reduxjs/toolkit";
-import chatStateReducer from "../features/chat/chat_mode_slice";
-import sideBarReducer from "../features/chat/toggle_sidebar";
-import authenticationReducer from "../features/auth/authentication_slice";
+import chatStateReducer from "@/features/chat/state/chat_mode_slice";
+import sideBarReducer from "@/features/chat/state/sidebar_slice";
+import authenticationReducer from "@/features/auth/state/auth_slice";
 import { useDispatch, useSelector} from "react-redux";
-import { storageApi } from "../features/storage/storage_api";
-import sessionReducer from "../features/chat/session_slice_practice";
-import storageSearchReducer from "../features/storage/storage_search_slice";
+import { storageApi } from "@/features/storage/api/storage_api";
+import sessionReducer from "@/features/chat/state/session_slice";
+import storageSearchReducer from "@/features/storage/state/storage_search_slice";
 
 export const store = configureStore({
   reducer: {

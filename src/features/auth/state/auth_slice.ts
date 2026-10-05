@@ -1,5 +1,5 @@
 import { createAsyncThunk, createSlice, type PayloadAction } from "@reduxjs/toolkit";
-import { auth } from "../../shared/firebase_config";
+import { auth } from "@/shared/lib/firebase";
 
 interface User {
   uid: string;
