@@ -15,12 +15,13 @@ import { ScheduleDialog } from "@/features/agents/components/schedule_dialog";
 import { AgentAvatar } from "@/shared/ui/agent_avatar";
 import { Button, ConfirmDialog, ErrorNote, Toggle } from "@/shared/ui/ui";
 import { InstructionFilesEditor, InstructionsImport, LoadDescriptionButton } from "@/features/agents/components/instruction_files";
+import { AgentSkillsSection } from "@/features/skills/components/agent_skills";
 
 type Tab = "configure" | "tools" | "schedules" | "activity";
 
 const EMOJIS = ["🤖", "🧠", "🦉", "📚", "🧾", "🎓", "💼", "📰", "🛠️", "🔍", "📈", "💡", "✍️", "🧪", "🗂️", "📅", "🌐", "🛡️", "💬", "🎯", "⚙️", "📦", "🧭", "🚀"];
 
-const EMPTY: AgentInput = { name: "", icon: "🤖", description: "", instructions: "", provider: null, model: null, builtin_tools: ["search_knowledge_base"], document_keys: [], starters: [], instruction_files: [] };
+const EMPTY: AgentInput = { name: "", icon: "🤖", description: "", instructions: "", provider: null, model: null, builtin_tools: ["search_knowledge_base"], document_keys: [], starters: [], instruction_files: [], skill_mode: "all", skill_ids: [] };
 
 const fmtDate = (iso: string | null) => (iso ? new Date(iso).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }) : "—");
 const relative = (iso: string | null) => {
@@ -70,6 +71,7 @@ export const AgentEditor = () => {
           name: d.name, icon: d.icon, description: d.description, instructions: d.instructions, provider: d.provider,
           model: d.model, builtin_tools: d.builtin_tools, document_keys: d.document_keys, starters: d.starters,
           instruction_files: d.instruction_files ?? [],
+          skill_mode: d.skill_mode ?? "all", skill_ids: d.skill_ids ?? [],
         };
         setForm(input);
         setSaved(input);
@@ -338,6 +340,12 @@ const ConfigureTab = ({ isNew, form, set, catalog, documents, describe, setDescr
           )}
           {!documents.length && <p className="ag_muted ag_small">Your knowledge base is empty — upload documents from “Knowledge base” in the sidebar.</p>}
         </section>
+
+        <AgentSkillsSection
+          mode={form.skill_mode ?? "all"}
+          ids={form.skill_ids ?? []}
+          onChange={(mode, ids) => { set("skill_mode", mode); set("skill_ids", ids); }}
+        />
 
         <section className="ag_section">
           <h2 className="ag_section__title">Built-in tools</h2>

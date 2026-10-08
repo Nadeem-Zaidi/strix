@@ -65,7 +65,9 @@ export type WhatsAppAway = {
 };
 
 class Api extends BaseApi {
-    private abortController: AbortController | null = null;
+    // One per chat: several chats can stream at once (switch chats mid-reply),
+    // and Stop must cancel the one you're looking at, not the latest one.
+    private abortControllers = new Map<string, AbortController>();
 
     constructor() {
         super(import.meta.env.VITE_API_URL);
@@ -77,6 +79,10 @@ class Api extends BaseApi {
 
     async getSession(sessionId: string): Promise<Session> {
         return await this.get<Session>(`/get_session/${sessionId}`); // path param, not query
+    }
+
+    async setPinned(sessionId: string, pinned: boolean) {
+        return await this.put<{ id: string; pinned_at: string | null }>(`/sessions/${encodeURIComponent(sessionId)}/pin`, { pinned });
     }
 
     async deleteSession(sessionId: string) {
@@ -105,20 +111,22 @@ class Api extends BaseApi {
         // Same, for a provider agent (Claude Managed Agents / OpenAI Agents API).
         nativeAgentId?: string
     ) {
-        this.abortController = new AbortController();
+        this.abortControllers.get(sessionId)?.abort();
+        const controller = new AbortController();
+        this.abortControllers.set(sessionId, controller);
 
         try {
             await this.stream(
                 "/chat_stream",
                 { currentSessionId: sessionId, llmMessage: message, provider: selection?.provider, model: selection?.model, agentId, nativeAgentId },
                 (_event, data) => onChunk(data as StreamChunk),
-                this.abortController.signal
+                controller.signal
             );
-            if (!this.abortController?.signal.aborted) {
+            if (!controller.signal.aborted) {
                 onChunk({ type: "done", isDone: true });
             }
         } catch (err) {
-            if (!this.abortController?.signal.aborted) {
+            if (!controller.signal.aborted) {
                 onChunk({
                     type: "error",
                     code: "stream_error",
@@ -126,13 +134,21 @@ class Api extends BaseApi {
                 });
             }
         } finally {
-            this.abortController = null;
+            if (this.abortControllers.get(sessionId) === controller) this.abortControllers.delete(sessionId);
         }
     }
 
-    async abortChat() {
-        this.abortController?.abort();
-        this.abortController = null;
+    // Stops one chat's reply — or every running reply when no chat is given.
+    // Closing the request makes the server stop the model (and, for provider
+    // agents, interrupt the remote session), so nothing keeps running or billing.
+    async abortChat(sessionId?: string) {
+        if (sessionId) {
+            this.abortControllers.get(sessionId)?.abort();
+            this.abortControllers.delete(sessionId);
+            return;
+        }
+        for (const c of this.abortControllers.values()) c.abort();
+        this.abortControllers.clear();
     }
 
     // Storage routes (list_files/upload/delete) are mounted at the app root

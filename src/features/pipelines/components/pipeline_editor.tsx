@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowDown, ArrowLeft, ArrowUp, Check, CheckCircle2, ChevronDown, Circle, Copy, LoaderCircle, MinusCircle, Play, Plus, Trash2, XCircle } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowUp, Check, CheckCircle2, ChevronDown, Circle, Copy, GitFork, LoaderCircle, MinusCircle, Play, Plus, Trash2, XCircle } from "lucide-react";
 import { loadStepAgents, providerLabel, stepKey, type StepAgent } from "@/features/pipelines/api/pipeline_agents";
 import { pipelinesApi, type PipelineInput, type PipelineRun, type StepRunStatus } from "@/features/pipelines/api/pipelines_api";
 import { AgentAvatar } from "@/shared/ui/agent_avatar";
@@ -54,6 +54,10 @@ export const PipelineEditor = () => {
           return;
         }
         const d = await pipelinesApi.getPipeline(routeId!);
+        if (d.is_workflow) {
+          navigate(`/pipelines/${routeId}/flow`, { replace: true });
+          return;
+        }
         const f = { name: d.name, description: d.description, steps: d.steps };
         setForm(f);
         setSaved(f);
@@ -63,7 +67,7 @@ export const PipelineEditor = () => {
         setLoadError(e instanceof Error ? e.message : "Couldn't load the pipeline");
       }
     })();
-  }, [isNew, routeId]);
+  }, [isNew, routeId, navigate]);
 
   // Poll the active run until it finishes.
   const activeId = active?.id;
@@ -159,6 +163,11 @@ export const PipelineEditor = () => {
         <div className="ag_editor_head__title">
           <h1>{isNew ? "New pipeline" : form.name || "Untitled pipeline"}</h1>
         </div>
+        {!isNew && (
+          <Button onClick={() => navigate(`/pipelines/${routeId}/flow`)} disabled={dirty} title={dirty ? "Save your changes first" : "Open in the visual editor to add conditions, branches and approvals"}>
+            <GitFork size={15} /> Convert to workflow
+          </Button>
+        )}
       </header>
 
       <div className="pl_layout">

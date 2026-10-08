@@ -25,6 +25,9 @@ export type Agent = {
   document_keys: string[];
   starters: string[];
   instruction_files: InstructionFile[];
+  // Which of the owner's skills the agent may load.
+  skill_mode?: "all" | "selected" | "none";
+  skill_ids?: string[];
   created_at: string;
   updated_at: string;
 };
@@ -105,7 +108,7 @@ export type AgentRun = {
 
 export type AgentDetail = Agent & { functions: AgentFunction[]; codeFunctions: CodeFunction[]; mcpServers: McpServer[]; schedules: Schedule[] };
 
-export type AgentInput = Pick<Agent, "name" | "icon" | "description" | "instructions" | "provider" | "model" | "builtin_tools" | "document_keys" | "starters" | "instruction_files">;
+export type AgentInput = Pick<Agent, "name" | "icon" | "description" | "instructions" | "provider" | "model" | "builtin_tools" | "document_keys" | "starters" | "instruction_files" | "skill_mode" | "skill_ids">;
 
 export type AgentDraft = Pick<Agent, "name" | "icon" | "description" | "instructions" | "builtin_tools" | "starters">;
 

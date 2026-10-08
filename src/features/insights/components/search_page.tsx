@@ -1,11 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AgentAvatar } from "@/shared/ui/agent_avatar";
 import { useNavigate } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faWhatsapp } from "@fortawesome/free-brands-svg-icons";
 import { LoaderCircle, MessageSquare, Search, X } from "lucide-react";
-import { useAppSelector } from "@/app/store";
 import { insightsApi, type SearchResult } from "@/features/insights/api/insights_api";
+import type { Session } from "@/shared/types";
 
 const relative = (iso: string) => {
   const s = Math.round((Date.now() - new Date(iso).getTime()) / 1000);
@@ -29,13 +29,53 @@ const SourceBadge = ({ r }: { r: Pick<SearchResult, "source" | "agent_icon" | "a
   </>
 );
 
+// Calls onVisible when the element scrolls into view (a little early, so the
+// next page is usually there before the user reaches the end).
+function useInfiniteScroll(onVisible: () => void, enabled: boolean) {
+  const ref = useRef<HTMLDivElement>(null);
+  const latest = useRef(onVisible);
+  useEffect(() => { latest.current = onVisible; });
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || !enabled) return;
+    const io = new IntersectionObserver((entries) => { if (entries.some((e) => e.isIntersecting)) latest.current(); }, { rootMargin: "300px 0px" });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [enabled]);
+  return ref;
+}
+
+const errorText = (e: unknown, fallback: string) => (e instanceof Error && e.message ? e.message : fallback);
+
+// Shimmer rows while a page loads.
+const SkeletonRows = ({ count }: { count: number }) => (
+  <ul className="srch_results srch_skeleton" aria-hidden="true">
+    {Array.from({ length: count }, (_, i) => (
+      <li key={i} className="srch_skeleton_row">
+        <span className="srch_skeleton_bar" style={{ width: `${[48, 62, 40, 55, 35][i % 5]}%` }} />
+        <span className="srch_skeleton_bar srch_skeleton_bar--time" />
+      </li>
+    ))}
+  </ul>
+);
+
 export const SearchPage = () => {
   const navigate = useNavigate();
-  const sessions = useAppSelector((s) => s.session.sessions);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult[] | null>(null);
+  const [nextOffset, setNextOffset] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const searchSeq = useRef(0);
+
+  // "All chats": every chat, fetched 30 at a time as the user scrolls.
+  const [chats, setChats] = useState<Session[]>([]);
+  const [chatsCursor, setChatsCursor] = useState<string | null>(null);
+  const [chatsDone, setChatsDone] = useState(false);
+  const [chatsLoading, setChatsLoading] = useState(false);
+  const [chatsError, setChatsError] = useState<string | null>(null);
+  const chatsBusy = useRef(false);
   const [active, setActive] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const trimmed = query.trim();
@@ -45,24 +85,65 @@ export const SearchPage = () => {
   // Search 300 ms after the user stops typing; ignore stale responses.
   useEffect(() => {
     if (trimmed.length < 2) return;
-    let cancelled = false;
+    const seq = ++searchSeq.current;
     const t = setTimeout(async () => {
       setLoading(true);
       setError(null);
       try {
         const r = await insightsApi.searchChats(trimmed);
-        if (!cancelled) { setResults(r); setActive(0); }
+        if (seq === searchSeq.current) { setResults(r.results); setNextOffset(r.nextOffset); setActive(0); }
       } catch (e) {
-        if (!cancelled) setError(e instanceof Error ? e.message : "Search failed");
+        if (seq === searchSeq.current) setError(errorText(e, "Search failed"));
       } finally {
-        if (!cancelled) setLoading(false);
+        if (seq === searchSeq.current) setLoading(false);
       }
     }, 300);
-    return () => { cancelled = true; clearTimeout(t); };
+    return () => { clearTimeout(t); };
   }, [trimmed]);
 
+  const loadMoreResults = async () => {
+    if (loading || loadingMore || nextOffset === null || trimmed.length < 2) return;
+    const seq = searchSeq.current;
+    setLoadingMore(true);
+    try {
+      const r = await insightsApi.searchChats(trimmed, nextOffset);
+      if (seq !== searchSeq.current) return; // the query changed meanwhile
+      setResults((prev) => {
+        const seen = new Set((prev ?? []).map((x) => x.session_id));
+        return [...(prev ?? []), ...r.results.filter((x) => !seen.has(x.session_id))];
+      });
+      setNextOffset(r.nextOffset);
+    } catch (e) {
+      if (seq === searchSeq.current) setError(errorText(e, "Couldn't load more results"));
+    } finally {
+      if (seq === searchSeq.current) setLoadingMore(false);
+    }
+  };
+
+  const loadMoreChats = useCallback(async () => {
+    if (chatsBusy.current || chatsDone) return;
+    chatsBusy.current = true;
+    setChatsLoading(true);
+    setChatsError(null);
+    try {
+      const r = await insightsApi.listSessions(chatsCursor);
+      setChats((prev) => {
+        const seen = new Set(prev.map((x) => x.id));
+        return [...prev, ...r.sessions.filter((x) => !seen.has(x.id))];
+      });
+      setChatsCursor(r.nextCursor);
+      if (!r.nextCursor) setChatsDone(true);
+    } catch (e) {
+      setChatsError(errorText(e, "Couldn't load your chats"));
+    } finally {
+      chatsBusy.current = false;
+      setChatsLoading(false);
+    }
+  }, [chatsCursor, chatsDone]);
+
   const shown = trimmed.length >= 2 ? results : null;
-  const recent = useMemo(() => sessions.slice(0, 8), [sessions]);
+  const resultsSentinel = useInfiniteScroll(() => void loadMoreResults(), !!shown && nextOffset !== null && !error);
+  const chatsSentinel = useInfiniteScroll(() => void loadMoreChats(), !shown && !chatsDone && !chatsError);
   const open = (sessionId: string) => navigate(`/chathome?session=${sessionId}`);
 
   const onKeyDown = (e: React.KeyboardEvent) => {
@@ -126,15 +207,17 @@ export const SearchPage = () => {
               </li>
             ))}
           </ul>
+          {loadingMore && <SkeletonRows count={3} />}
+          {nextOffset !== null && <div ref={resultsSentinel} className="srch_sentinel" />}
         </>
       )}
 
       {!shown && (
         <section className="srch_recent">
-          <span className="ag_field__label">Recent chats</span>
-          {recent.length === 0 && <p className="ag_muted ag_small">No chats yet.</p>}
+          <span className="ag_field__label">All chats</span>
+          {chatsDone && chats.length === 0 && <p className="ag_muted ag_small">No chats yet.</p>}
           <ul className="srch_results">
-            {recent.map((s) => (
+            {chats.map((s) => (
               <li key={s.id}>
                 <button type="button" className="srch_result srch_result--compact" onClick={() => open(s.id)}>
                   <div className="srch_result__head">
@@ -147,6 +230,14 @@ export const SearchPage = () => {
               </li>
             ))}
           </ul>
+          {chatsLoading && <SkeletonRows count={chats.length ? 3 : 8} />}
+          {chatsError && (
+            <div className="ag_error srch_load_error">
+              {chatsError} <button type="button" className="srch_retry" onClick={() => void loadMoreChats()}>Try again</button>
+            </div>
+          )}
+          {!chatsDone && !chatsError && <div ref={chatsSentinel} className="srch_sentinel" />}
+          {chatsDone && chats.length > 0 && <p className="ag_muted ag_small srch_end">That's all {chats.length} chat{chats.length === 1 ? "" : "s"}.</p>}
         </section>
       )}
     </div>

@@ -46,7 +46,7 @@ export const WhatsAppConnect = ({ mode, sessionId, onClose }: WhatsAppConnectPro
         const status = await api.getWhatsAppStatus();
         if (cancelled) return;
         if (!status.enabled) {
-          return setView({ kind: "unavailable", reason: "WhatsApp isn't enabled on this server yet. Set WHATSAPP_ENABLED=true in the backend .env and restart it." });
+          return setView({ kind: "unavailable", reason: "WhatsApp is turned off. The app owner can turn it on in Server settings (account menu)." });
         }
         if (!status.botConnected) {
           if (!status.canPair) {

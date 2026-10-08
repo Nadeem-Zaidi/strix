@@ -1,4 +1,5 @@
 import { BaseApi } from "@/shared/api/base_fetch";
+import type { Session } from "@/shared/types";
 
 export type TokenCounts = {
   input_tokens: number;
@@ -15,8 +16,8 @@ export type UsageSummary = {
   estimated_cost_usd: number;
   cost_is_partial: boolean; // some models had no known price
   byDay: (TokenCounts & { day: string })[];
-  byModel: (TokenCounts & { provider: string | null; model: string | null; cost_usd: number | null })[];
-  bySource: (TokenCounts & { source: "chat" | "agent" | "whatsapp" | "pipeline" | "agent_builder" })[];
+  byModel: (TokenCounts & { provider: string | null; model: string | null; byok?: boolean; cost_usd: number | null })[];
+  bySource: (TokenCounts & { source: "chat" | "agent" | "whatsapp" | "telegram" | "pipeline" | "agent_builder" })[];
   topChats: (TokenCounts & { session_id: string; title: string | null })[];
 };
 
@@ -39,7 +40,14 @@ class InsightsApi extends BaseApi {
   }
 
   usageSummary(days: number) { return this.get<UsageSummary>("/usage/summary", { days }); }
-  async searchChats(q: string) { return (await this.get<{ results: SearchResult[] }>("/search", { q })).results; }
+  // Ranked matches, a page at a time; nextOffset is null on the last page.
+  searchChats(q: string, offset = 0) {
+    return this.get<{ results: SearchResult[]; nextOffset: number | null }>("/search", { q, offset });
+  }
+  // Every chat, newest activity first, a page at a time (infinite scroll).
+  listSessions(cursor?: string | null) {
+    return this.get<{ sessions: Session[]; nextCursor: string | null }>("/sessions", cursor ? { cursor } : {});
+  }
 }
 
 export const insightsApi = new InsightsApi();

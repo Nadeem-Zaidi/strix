@@ -3,6 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="theme-color" content="#2a74a8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Owl Bot</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -10,9 +11,107 @@
     <!-- App UI (Sora, Inter) and sign-in page (Syne, Playfair Display, Space Mono, DM Sans). -->
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" />
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" />
+    <!-- Loading screen: an animated owl shown from the very first paint until
+         the app is ready (React replaces #root's contents on its first render,
+         and shows the same markup — shared/ui/owl_loader.tsx — while it checks
+         sign-in). The CSS lives here, not in the bundle, so it works before
+         any JavaScript or stylesheet has downloaded. -->
+    <style>
+      .owl-splash {
+        position: fixed; inset: 0; z-index: 9999;
+        display: grid; place-items: center;
+        background: radial-gradient(circle at 50% 42%, #eaf4fb 0, #f5f8fb 58%);
+        font-family: Sora, Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+        animation: owl-fade-in 0.35s ease 0.12s both;
+      }
+      .owl-splash__stage { display: flex; flex-direction: column; align-items: center; gap: 14px; }
+      .owl-splash__orb { position: relative; width: 140px; height: 140px; display: grid; place-items: center; }
+      .owl-splash__orb::before {
+        content: ""; position: absolute; inset: 0; border-radius: 50%;
+        background: radial-gradient(circle, rgba(89, 165, 216, 0.24), rgba(89, 165, 216, 0) 68%);
+        animation: owl-glow 2.4s ease-in-out infinite;
+      }
+      .owl-splash__owl { position: relative; width: 108px; height: 108px; overflow: visible; }
+      .owl-splash__branch { stroke: #cbd5e1; stroke-width: 3; stroke-linecap: round; }
+      .owl-splash__bird { transform-origin: 32px 58px; animation: owl-breathe 2.4s ease-in-out infinite; }
+      .owl-splash__feet { stroke: #f59e0b; stroke-width: 1.8; stroke-linecap: round; }
+      .owl-splash__tuft { fill: #2a74a8; stroke: #2a74a8; stroke-width: 1.5; stroke-linejoin: round; }
+      .owl-splash__body { fill: url(#owl-splash-body); stroke: #2a74a8; stroke-width: 2.2; }
+      .owl-splash__wing { fill: #9ccbea; stroke: #2a74a8; stroke-width: 1.8; stroke-linejoin: round; }
+      .owl-splash__wing--l { transform-origin: 15px 33px; animation: owl-wing-l 2.4s ease-in-out infinite; }
+      .owl-splash__wing--r { transform-origin: 49px 33px; animation: owl-wing-r 2.4s ease-in-out infinite; }
+      .owl-splash__belly { stroke: #59a5d8; stroke-width: 1.6; stroke-linecap: round; fill: none; }
+      .owl-splash__disc { fill: #ffffff; opacity: 0.6; }
+      .owl-splash__eyes { transform-box: fill-box; transform-origin: center; animation: owl-blink 4.2s infinite; }
+      .owl-splash__eye { fill: #ffffff; stroke: #2a74a8; stroke-width: 2; }
+      .owl-splash__pupils { animation: owl-look 4.2s ease-in-out infinite; }
+      .owl-splash__pupil { fill: #0b2a45; }
+      .owl-splash__shine { fill: #ffffff; }
+      .owl-splash__beak { fill: #f59e0b; stroke: #d97706; stroke-width: 0.8; stroke-linejoin: round; }
+      .owl-splash__name { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: 0.01em; color: #14202b; }
+      .owl-splash__bar { position: relative; width: 120px; height: 3px; border-radius: 3px; background: #cfe5f4; overflow: hidden; }
+      .owl-splash__bar::after {
+        content: ""; position: absolute; top: 0; bottom: 0; left: 0; width: 40%;
+        border-radius: inherit; background: linear-gradient(90deg, #59a5d8, #2a74a8);
+        animation: owl-bar 1.3s ease-in-out infinite;
+      }
+      @keyframes owl-fade-in { from { opacity: 0; } to { opacity: 1; } }
+      @keyframes owl-glow { 0%, 100% { transform: scale(0.9); opacity: 0.7; } 50% { transform: scale(1.08); opacity: 1; } }
+      @keyframes owl-breathe { 0%, 100% { transform: scale(1, 1); } 50% { transform: scale(1.02, 0.975); } }
+      @keyframes owl-wing-l { 0%, 100% { transform: rotate(0); } 50% { transform: rotate(-7deg); } }
+      @keyframes owl-wing-r { 0%, 100% { transform: rotate(0); } 50% { transform: rotate(7deg); } }
+      @keyframes owl-blink { 0%, 44%, 50%, 100% { transform: scaleY(1); } 47% { transform: scaleY(0.1); } }
+      @keyframes owl-look {
+        0%, 15% { transform: translateX(0); } 25%, 40% { transform: translateX(-2px); }
+        55%, 70% { transform: translateX(2px); } 80%, 100% { transform: translateX(0); }
+      }
+      @keyframes owl-bar { from { transform: translateX(-100%); } to { transform: translateX(250%); } }
+      @media (prefers-reduced-motion: reduce) {
+        .owl-splash, .owl-splash *, .owl-splash *::before, .owl-splash *::after { animation: none !important; }
+      }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div class="owl-splash" role="status" aria-label="Loading Strix">
+        <div class="owl-splash__stage">
+          <div class="owl-splash__orb">
+            <svg class="owl-splash__owl" viewBox="0 0 64 64" fill="none" aria-hidden="true">
+                <defs>
+                  <linearGradient id="owl-splash-body" x1="32" y1="9" x2="32" y2="56" gradientUnits="userSpaceOnUse">
+                    <stop offset="0" stop-color="#eaf4fb" />
+                    <stop offset="1" stop-color="#b9daf0" />
+                  </linearGradient>
+                </defs>
+                <path class="owl-splash__branch" d="M8 59.5h48" />
+                <g class="owl-splash__bird">
+                  <path class="owl-splash__feet" d="M27.5 55.5v3m3-3v3m3.5-3v3m3-3v3" />
+                  <path class="owl-splash__tuft" d="M19 15 15.5 5.5l10 6ZM45 15l3.5-9.5-10 6Z" />
+                  <path class="owl-splash__body" d="M32 9C19.5 9 13 18.5 13 30v7c0 12.5 8.5 19 19 19s19-6.5 19-19v-7C51 18.5 44.5 9 32 9Z" />
+                  <path class="owl-splash__wing owl-splash__wing--l" d="M14.5 33c-5 6-4 15 3 19-.5-7-1-13-3-19Z" />
+                  <path class="owl-splash__wing owl-splash__wing--r" d="M49.5 33c5 6 4 15-3 19 .5-7 1-13 3-19Z" />
+                  <path class="owl-splash__belly" d="M25 44.5q3.5 2.6 7 0 3.5 2.6 7 0m-11.5 5q2.25 1.8 4.5 0 2.25 1.8 4.5 0" />
+                  <circle class="owl-splash__disc" cx="24" cy="27.5" r="10.5" />
+                  <circle class="owl-splash__disc" cx="40" cy="27.5" r="10.5" />
+                  <g class="owl-splash__eyes">
+                    <circle class="owl-splash__eye" cx="24" cy="27" r="7.5" />
+                    <circle class="owl-splash__eye" cx="40" cy="27" r="7.5" />
+                    <g class="owl-splash__pupils">
+                      <circle class="owl-splash__pupil" cx="24" cy="27" r="3.4" />
+                      <circle class="owl-splash__pupil" cx="40" cy="27" r="3.4" />
+                      <circle class="owl-splash__shine" cx="25.2" cy="25.6" r="1.1" />
+                      <circle class="owl-splash__shine" cx="41.2" cy="25.6" r="1.1" />
+                    </g>
+                  </g>
+                  <path class="owl-splash__beak" d="M29.6 33.5 32 38.6l2.4-5.1Z" />
+                </g>
+              </svg>
+          </div>
+          <p class="owl-splash__name">Strix</p>
+          <div class="owl-splash__bar"></div>
+        </div>
+      </div>
+    </div>
     <div id="modal-root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

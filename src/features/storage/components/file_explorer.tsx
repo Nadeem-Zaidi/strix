@@ -22,13 +22,19 @@ import {
   RotateCcw,
   Trash2,
   Check,
+  DatabaseZap,
+  Ban,
+  Link2,
 } from 'lucide-react';
 import { ChatPage } from '@/features/chat/components/chat_page';
 import {
   useDeleteFilesMutation,
+  useIndexFilesMutation,
   useListFilesQuery,
   useUploadFilesMutation,
+  type CloudFile,
 } from '@/features/storage/api/storage_api';
+import { auth } from '@/shared/lib/firebase';
 import { useAppDispatch, useAppSelector } from '@/app/store';
 import { clearStorageSearchQuery, setStorageSearchQuery } from '@/features/storage/state/storage_search_slice';
 
@@ -76,6 +82,77 @@ function getFileVisual(name: string): { Icon: typeof FileIcon; className: string
     return { Icon: FileCode2, className: 'file-icon--code' };
   }
   return { Icon: FileIcon, className: 'file-icon--default' };
+}
+
+function ownerInitials(): string {
+  const user = auth.currentUser;
+  const source = user?.displayName?.trim() || user?.email?.split('@')[0] || '';
+  const parts = source.split(/[\s._-]+/).filter(Boolean);
+  return (parts.length > 1 ? parts[0][0] + parts[1][0] : source.slice(0, 2)).toUpperCase() || '?';
+}
+
+const baseName = (key: string) => key.split('/').pop() || key;
+
+function formatChanged(value: string | null): string {
+  const date = value ? new Date(value) : null;
+  if (!date || Number.isNaN(date.getTime())) return '—';
+  return date.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+}
+
+type RagBadgeProps = {
+  file: CloudFile;
+  indexing: boolean;
+  onIndex: () => void;
+};
+// Whether the AI can search this file (RAG), with a button for files that
+// aren't indexed yet.
+function RagBadge({ file, indexing, onIndex }: RagBadgeProps) {
+  const rag = file.rag;
+  if (!rag) return <span className="text-secondary">—</span>;
+  if (indexing) {
+    return (
+      <span className="rag-badge rag-badge--busy">
+        <Loader2 size={13} className="spinner-icon" />
+        <span className="rag-badge__label">Indexing…</span>
+      </span>
+    );
+  }
+  switch (rag.status) {
+    case 'indexed':
+      return (
+        <span className="rag-badge rag-badge--indexed" title={`Searchable by the AI · ${rag.chunks} section${rag.chunks === 1 ? '' : 's'}`}>
+          <CheckCircle2 size={13} />
+          <span className="rag-badge__label">Indexed</span>
+        </span>
+      );
+    case 'copy':
+      return (
+        <span className="rag-badge rag-badge--copy" title={`Text copy of "${baseName(rag.of)}" — searchable through that file`}>
+          <Link2 size={13} />
+          <span className="rag-badge__label">Text copy</span>
+        </span>
+      );
+    case 'unsupported':
+      return (
+        <span className="rag-badge rag-badge--none" title="No text to search in this kind of file">
+          <Ban size={13} />
+          <span className="rag-badge__label">No text</span>
+        </span>
+      );
+    default:
+      return (
+        <button
+          type="button"
+          className="rag-index-btn"
+          title="Not searchable yet — build the AI search index for this file"
+          aria-label={`Index ${file.name} for AI search`}
+          onClick={onIndex}
+        >
+          <DatabaseZap size={13} />
+          <span className="rag-badge__label">Index now</span>
+        </button>
+      );
+  }
 }
 
 type ConfirmDialogProps = {
@@ -222,12 +299,57 @@ export function S3FolderBrowser() {
   };
   const [triggerUpload] = useUploadFilesMutation();
   const [triggerDelete, { isLoading: isDeleting }] = useDeleteFilesMutation();
+  const [triggerIndex] = useIndexFilesMutation();
+
+  // Search index (RAG): which rows are indexing right now, and the outcome
+  // of the last run (shown in a banner above the list).
+  const [indexingKeys, setIndexingKeys] = useState<Set<string>>(new Set());
+  const [indexingAll, setIndexingAll] = useState(false);
+  const [indexNotice, setIndexNotice] = useState<{ tone: 'success' | 'error'; text: string } | null>(null);
+  const ownerAvatar = ownerInitials();
+
+  const indexFiles = async (keys: string[] | 'all') => {
+    setIndexNotice(null);
+    const all = keys === 'all';
+    if (all) setIndexingAll(true);
+    else setIndexingKeys((prev) => new Set([...prev, ...keys]));
+    try {
+      const r = await triggerIndex(all ? { all: true } : { keys }).unwrap();
+      const failures = r.results.filter((x) => x.status === 'failed');
+      if (r.indexed === 0 && failures.length === 0) {
+        setIndexNotice({ tone: 'success', text: 'Every file is already indexed.' });
+      } else if (failures.length === 0) {
+        setIndexNotice({
+          tone: 'success',
+          text: `Indexed ${r.indexed} file${r.indexed === 1 ? '' : 's'} — the AI can search ${r.indexed === 1 ? 'it' : 'them'} now.${r.remaining ? ` ${r.remaining} more left; run it again.` : ''}`,
+        });
+      } else {
+        const first = failures[0];
+        setIndexNotice({
+          tone: 'error',
+          text: `${r.indexed ? `Indexed ${r.indexed}, ` : ''}${failures.length} failed${first.status === 'failed' ? ` — ${first.error}` : ''}`,
+        });
+      }
+    } catch (err) {
+      setIndexNotice({ tone: 'error', text: getErrorMessage(err) });
+    } finally {
+      if (all) setIndexingAll(false);
+      else
+        setIndexingKeys((prev) => {
+          const next = new Set(prev);
+          keys.forEach((k) => next.delete(k));
+          return next;
+        });
+    }
+  };
 
   const activeUploadsCount = uploadQueue.filter((item) => item.status === 'uploading').length;
   const isUploading = activeUploadsCount > 0;
 
   const files = data?.files ?? [];
   const allSelected = files.length > 0 && files.every((f) => selectedKeys.has(f.key));
+  const unindexedCount = files.filter((f) => f.rag?.status === 'not_indexed').length;
+  const selectedUnindexed = files.filter((f) => selectedKeys.has(f.key) && f.rag?.status === 'not_indexed').map((f) => f.key);
 
   const updateItem = (id: string, patch: Partial<UploadItem>) => {
     setUploadQueue((prev) => prev.map((item) => (item.id === id ? { ...item, ...patch } : item)));
@@ -509,6 +631,19 @@ export function S3FolderBrowser() {
               />
             </div>
 
+            {(unindexedCount > 0 || indexingAll) && (
+              <button
+                type="button"
+                className="btn btn--ghost index-all-btn"
+                disabled={indexingAll}
+                title="Build the AI search index for every file that doesn't have one yet"
+                onClick={() => indexFiles('all')}
+              >
+                {indexingAll ? <Loader2 size={15} className="spinner-icon" /> : <DatabaseZap size={15} />}
+                <span>{indexingAll ? 'Indexing…' : 'Index all'}</span>
+              </button>
+            )}
+
             <div className="action-icons__divider" />
 
             <button type="button" className="icon-button" aria-label="Advanced Search">
@@ -547,6 +682,16 @@ export function S3FolderBrowser() {
           </div>
         </div>
 
+        {indexNotice && (
+          <div className={`index-notice index-notice--${indexNotice.tone}`} role="status">
+            {indexNotice.tone === 'success' ? <CheckCircle2 size={15} /> : <AlertCircle size={15} />}
+            <span>{indexNotice.text}</span>
+            <button type="button" className="index-notice__close" aria-label="Dismiss" onClick={() => setIndexNotice(null)}>
+              <X size={14} />
+            </button>
+          </div>
+        )}
+
         <div className="storage-file-list-container">
           {/* Selection toolbar replaces the header row while something is selected */}
           {selectedKeys.size > 0 ? (
@@ -558,6 +703,12 @@ export function S3FolderBrowser() {
               </button>
               <span className="selection-bar__count">{selectedKeys.size} selected</span>
               <div className="selection-bar__spacer" />
+              {selectedUnindexed.length > 0 && (
+                <button type="button" className="btn btn--ghost btn--sm" onClick={() => indexFiles(selectedUnindexed)}>
+                  <DatabaseZap size={14} />
+                  Index {selectedUnindexed.length}
+                </button>
+              )}
               <button
                 type="button"
                 className="btn btn--danger btn--sm"
@@ -586,7 +737,7 @@ export function S3FolderBrowser() {
               <div className="cell">Name</div>
               <div className="cell date-cell">Changed Date</div>
               <div className="cell owner-cell">Owner</div>
-              <div className="cell location-cell">Location</div>
+              <div className="cell rag-cell">AI search</div>
               <div className="cell action-cell"></div>
             </div>
           )}
@@ -609,7 +760,7 @@ export function S3FolderBrowser() {
                     <div className="cell owner-cell">
                       <div className="skeleton skeleton--text" style={{ width: '40%' }} />
                     </div>
-                    <div className="cell location-cell">
+                    <div className="cell rag-cell">
                       <div className="skeleton skeleton--text" style={{ width: '50%' }} />
                     </div>
                     <div className="cell action-cell" />
@@ -670,18 +821,22 @@ export function S3FolderBrowser() {
                       <div className="name-cell__text">
                         <span className="truncate">{file.name}</span>
                         {/* Shown only once the Date column is hidden on narrow widths */}
-                        <span className="name-cell__meta truncate">{file.lastModified ?? '—'}</span>
+                        <span className="name-cell__meta truncate">{formatChanged(file.lastModified)}</span>
                       </div>
                     </div>
                     <div className="cell date-cell">
-                      <span className="truncate text-secondary">{file.lastModified ?? '—'}</span>
+                      <span className="truncate text-secondary">{formatChanged(file.lastModified)}</span>
                     </div>
                     <div className="cell owner-cell">
-                      <div className="avatar">A</div>
-                      <span className="text-secondary">me</span>
+                      <div className="avatar" aria-hidden="true">{ownerAvatar}</div>
+                      <span className="text-secondary truncate">You</span>
                     </div>
-                    <div className="cell location-cell">
-                      <span className="text-secondary truncate">My Drive</span>
+                    <div className="cell rag-cell">
+                      <RagBadge
+                        file={file}
+                        indexing={indexingAll ? file.rag?.status === 'not_indexed' : indexingKeys.has(file.key)}
+                        onIndex={() => indexFiles([file.key])}
+                      />
                     </div>
                     <div className="cell action-cell">
                       <button

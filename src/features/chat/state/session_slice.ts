@@ -27,6 +27,21 @@ export const loadSessions = createAsyncThunk<Session[], void, { rejectValue: str
     }
 );
 
+// Global — pins (favourites) or unpins a chat. The sidebar updates at once and
+// rolls back if the server refuses (e.g. too many pinned chats).
+export const setSessionPinned = createAsyncThunk<
+    { sessionId: string; pinned_at: string | null },
+    { sessionId: string; pinned: boolean },
+    { rejectValue: string }
+>("session/setPinned", async ({ sessionId, pinned }, { rejectWithValue }) => {
+    try {
+        const r = await api.setPinned(sessionId, pinned);
+        return { sessionId, pinned_at: r.pinned_at };
+    } catch (err) {
+        return rejectWithValue(err instanceof Error ? err.message : "Couldn't update the pin");
+    }
+});
+
 // Global — deletes a session everywhere; any window pointing at it gets cleared below
 export const deleteSession = createAsyncThunk<string, string, { rejectValue: string }>(
     "session/delete",
@@ -122,6 +137,10 @@ interface ChatWindowState {
 interface SessionState {
     sessions: Session[]; // shared across all windows
     status: "idle" | "loading" | "error"; // status of the shared sessions list
+    // True once the list has loaded (or failed) at least once. Later
+    // refreshes (tab focus, new chat) keep showing the old list instead of
+    // the loading skeleton.
+    sessionsLoaded: boolean;
     windows: Record<string, ChatWindowState>;
     // Global — sessionIds that currently have a response streaming, whether
     // or not any window has that session open right now. This is what lets
@@ -142,6 +161,7 @@ const emptyWindow = (windowId: string): ChatWindowState => ({
 const initialState: SessionState = {
     sessions: [],
     status: "idle",
+    sessionsLoaded: false,
     windows: {},
     streamingSessionIds: [],
 };
@@ -258,6 +278,19 @@ const sessionSlice = createSlice({
                     state.sessions.unshift(session);
                 }
             })
+            .addCase(setSessionPinned.pending, (state, action) => {
+                const s = state.sessions.find((x) => x.id === action.meta.arg.sessionId);
+                if (s) s.pinned_at = action.meta.arg.pinned ? (s.pinned_at ?? new Date().toISOString()) : null;
+            })
+            .addCase(setSessionPinned.fulfilled, (state, action) => {
+                const s = state.sessions.find((x) => x.id === action.payload.sessionId);
+                if (s) s.pinned_at = action.payload.pinned_at;
+            })
+            .addCase(setSessionPinned.rejected, (state, action) => {
+                // Undo the optimistic change.
+                const s = state.sessions.find((x) => x.id === action.meta.arg.sessionId);
+                if (s) s.pinned_at = action.meta.arg.pinned ? null : new Date().toISOString();
+            })
             .addCase(deleteSession.fulfilled, (state, action) => {
                 const deletedId = action.payload;
                 state.sessions = state.sessions.filter(s => s.id !== deletedId);
@@ -348,10 +381,11 @@ const sessionSlice = createSlice({
                 win.cacheChatMessages = storedMessages;
             })
             .addCase(loadSessions.pending, (state) => { state.status = "loading"; })
-            .addCase(loadSessions.rejected, (state) => { state.status = "error"; })
+            .addCase(loadSessions.rejected, (state) => { state.status = "error"; state.sessionsLoaded = true; })
             .addCase(loadSessions.fulfilled, (state, action) => {
                 state.sessions = action.payload;
                 state.status = "idle";
+                state.sessionsLoaded = true;
             });
     },
 });

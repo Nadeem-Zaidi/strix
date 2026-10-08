@@ -10,12 +10,29 @@ function waitForAuthUser(): Promise<User | null> {
         });
     });
 }
+// Search-index (RAG) state of a file — see RagStatus in knowledge_base.ts.
+export type RagStatus =
+    | { status: "indexed"; chunks: number }
+    | { status: "not_indexed" }
+    | { status: "copy"; of: string }
+    | { status: "unsupported" };
+
 export interface CloudFile {
     key: string;
     name: string;
     lastModified: string | null;
     size?: number;
     url?: string;
+    // Missing when the server couldn't read the index status.
+    rag?: RagStatus;
+}
+
+export interface IndexFilesResponse {
+    indexed: number;
+    failed: number;
+    // Files left over when { all: true } found more than one request handles.
+    remaining: number;
+    results: ({ key: string; status: "indexed"; chunks: number } | { key: string; status: "failed"; error: string })[];
 }
 
 export interface ListFilesResponse {
@@ -106,6 +123,14 @@ export const storageApi = createApi({
             invalidatesTags: [{ type: "File", id: "LIST" }], // this is the whole payoff: upload succeeds → list auto-refetches
         }),
 
+        // Builds the search index for files already in storage (uploads are
+        // indexed automatically). { keys } for specific files, { all: true }
+        // for every file that isn't indexed yet.
+        indexFiles: builder.mutation<IndexFilesResponse, { keys: string[] } | { all: true }>({
+            query: (body) => ({ url: "/index_files", method: "POST", body }),
+            invalidatesTags: [{ type: "File", id: "LIST" }],
+        }),
+
         deleteFiles: builder.mutation<DeleteFilesResponse, string[]>({
             query: (keys) => ({
                 url: "/delete",
@@ -122,4 +147,4 @@ export const storageApi = createApi({
     }),
 });
 
-export const { useListFilesQuery, useUploadFilesMutation, useDeleteFilesMutation } = storageApi;
+export const { useListFilesQuery, useUploadFilesMutation, useDeleteFilesMutation, useIndexFilesMutation } = storageApi;

@@ -29,7 +29,7 @@ const relative = (iso: string) => {
 };
 
 // Automatic reply sent to people who message your number while you're away
-// (bot running on your own number, WHATSAPP_SELF_CHAT=true).
+// (bot running on your own number: self-chat mode in Server settings).
 export const WhatsAppAwayPanel = () => {
   const [saved, setSaved] = useState<WhatsAppAway | null>(null);
   const [enabled, setEnabled] = useState(false);

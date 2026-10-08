@@ -2,7 +2,10 @@ import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/shared/lib/firebase";
 import type { FilesResult, Message, Session } from "@/shared/types";
 
-const BASE = import.meta.env.VITE_API_URL?.replace(/\/api\/?$/, "") || "http://localhost:3000";
+// VITE_API_URL="/api" (same-origin, production) gives "" here — that's valid,
+// so only fall back to the local API when the variable isn't set at all.
+const API_URL = import.meta.env.VITE_API_URL as string | undefined;
+const BASE = API_URL !== undefined ? API_URL.replace(/\/api\/?$/, "") : "http://localhost:3000";
 
 export const getAuthHeader = async () => {
   const user = auth.currentUser ?? await new Promise<any>((resolve) => {

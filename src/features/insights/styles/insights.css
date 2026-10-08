@@ -584,3 +584,67 @@
 .srch_more {
     padding-left: 23px;
 }
+
+/* ── Infinite scroll: page loader (shimmer), sentinel, end note ── */
+.srch_skeleton {
+    margin-top: 8px;
+}
+
+.srch_skeleton_row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 15px 16px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--bg-surface);
+}
+
+.srch_skeleton_bar {
+    display: block;
+    height: 11px;
+    border-radius: 6px;
+    background: linear-gradient(90deg, var(--bg-active) 0%, var(--bg-active) 35%, var(--bg-subtle) 50%, var(--bg-active) 65%, var(--bg-active) 100%);
+    background-size: 300% 100%;
+    animation: srch_shimmer 1.4s ease-in-out infinite;
+}
+
+.srch_skeleton_bar--time {
+    width: 44px;
+    margin-left: auto;
+    flex-shrink: 0;
+}
+
+@keyframes srch_shimmer {
+    from { background-position: 100% 0; }
+    to { background-position: 0 0; }
+}
+
+.srch_sentinel {
+    height: 1px;
+}
+
+.srch_end {
+    margin: 14px 2px 4px;
+    text-align: center;
+}
+
+.srch_load_error {
+    margin-top: 10px;
+}
+
+.srch_retry {
+    background: none;
+    border: none;
+    padding: 0;
+    font: inherit;
+    color: var(--accent);
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .srch_skeleton_bar {
+        animation: none;
+    }
+}

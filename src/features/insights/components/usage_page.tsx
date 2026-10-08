@@ -12,7 +12,7 @@ const SERIES = [
 ] as const;
 
 const SOURCE_LABELS: Record<string, string> = {
-  chat: "Web chat", agent: "Agents & schedules", whatsapp: "WhatsApp", pipeline: "Pipelines", agent_builder: "“Generate with AI”",
+  chat: "Web chat", agent: "Agents & schedules", whatsapp: "WhatsApp", telegram: "Telegram", pipeline: "Pipelines", agent_builder: "“Generate with AI”",
 };
 
 const RANGES = [7, 30, 90];
@@ -191,8 +191,8 @@ export const UsagePage = () => {
                 <thead><tr><th>Model</th><th>Tokens</th><th>Calls</th><th>Est. cost</th></tr></thead>
                 <tbody>
                   {data.byModel.slice().sort((a, b) => b.total_tokens - a.total_tokens).map((m) => (
-                    <tr key={`${m.provider}:${m.model}`}>
-                      <td><span className="use_model">{m.model ?? "unknown"}</span><span className="ag_muted ag_small"> {m.provider === "anthropic" ? "Claude" : m.provider === "openai" ? "ChatGPT" : m.provider}</span></td>
+                    <tr key={`${m.provider}:${m.model}:${m.byok ? 1 : 0}`}>
+                      <td><span className="use_model">{m.model ?? "unknown"}</span><span className="ag_muted ag_small"> {m.provider === "anthropic" ? "Claude" : m.provider === "openai" ? "ChatGPT" : m.provider}{m.byok ? " · your key" : ""}</span></td>
                       <td>{formatTokens(m.total_tokens)}</td>
                       <td>{m.requests}</td>
                       <td>{m.cost_usd === null ? <span className="ag_muted">—</span> : fmtUsd(m.cost_usd)}</td>

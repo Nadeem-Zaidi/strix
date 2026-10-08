@@ -302,3 +302,58 @@
     cursor: pointer;
     background: transparent;
 }
+
+/* Pin button in the chat's top bar: sits with the other actions on the right. */
+.chat_topbar .topbar_pin {
+    margin-left: auto;
+    margin-right: 8px;
+}
+
+.chat_topbar .topbar_pin svg {
+    color: currentColor;
+}
+
+.topbar_pin.is_pinned {
+    color: var(--accent);
+    border-color: var(--accent);
+    background: var(--accent-soft);
+}
+
+/* ── "Memory updated" note under a reply ── */
+.memory_note {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 6px 0 2px;
+    font-size: 12.5px;
+    color: var(--text-sec);
+}
+
+.memory_note__icon {
+    flex-shrink: 0;
+    color: var(--accent);
+}
+
+.memory_note__text {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.memory_note__text strong {
+    font-weight: 600;
+    color: var(--text-pri);
+}
+
+.memory_note__link {
+    flex-shrink: 0;
+    background: none;
+    border: none;
+    padding: 0;
+    font: inherit;
+    color: var(--accent);
+    cursor: pointer;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}

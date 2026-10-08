@@ -16,6 +16,7 @@ import { authStart, authSuccess } from '@/features/auth/state/auth_slice';
 import { Firebase_Storage } from '@/features/auth/api/profile_store';
 import { User } from '@/features/auth/model/user';
 import { api } from '@/features/auth/api/auth_api';
+import { OwlLoader } from '@/shared/ui/owl_loader';
 
 
 declare global {
@@ -237,9 +238,7 @@ export const AuthMain = () => {
     );
     if (!authChecked) {
         return (
-            <div className="loading-screen">
-                Loading...
-            </div>
+            <OwlLoader />
         );
     }
     return (

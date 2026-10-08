@@ -55,7 +55,7 @@ export type Session={
   id:string
   userid:string
   title:string
-  source?:"web"|"whatsapp"
+  source?:"web"|"whatsapp"|"telegram"
   agent_id?:string|null
   agent_icon?:string|null
   agent_name?:string|null
@@ -64,6 +64,8 @@ export type Session={
   model?:string|null
   created_at:string
   updated_at:string
+  // Set when the chat is pinned (favourite); shown under "Pinned" in the sidebar.
+  pinned_at?:string|null
 
 }
 export type BotMessageProps = {

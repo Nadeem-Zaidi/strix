@@ -11,6 +11,9 @@
    - only the theme (last) overrides other files' rules on purpose.
    ═══════════════════════════════════════════════════════════════════ */
 
+/* Vendor — the workflow canvas (React Flow) base styles; ours override below. */
+@import "@xyflow/react/dist/style.css";
+
 /* Foundation */
 @import "./tokens.css";
 @import "./base.css";
@@ -27,11 +30,16 @@
 @import "../features/chat/styles/messages.css";
 @import "../features/chat/styles/composer.css";
 @import "../features/whatsapp/styles/whatsapp.css";
+@import "../features/telegram/styles/telegram.css";
+@import "../features/skills/styles/skills.css";
+@import "../features/pipelines/styles/workflows.css";
 @import "../features/agents/styles/agents.css";
 @import "../features/pipelines/styles/pipelines.css";
 @import "../features/native_agents/styles/native_agents.css";
 @import "../features/billing/styles/billing.css";
 @import "../features/insights/styles/insights.css";
+@import "../features/settings/styles/settings.css";
+@import "../features/artifacts/styles/artifacts.css";
 
 /* Theme — swap for ./themes/sand.css (or remove) to change the look. */
 @import "./themes/sky.css";

@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { onAuthStateChanged } from "firebase/auth";
 import { useNavigate } from "react-router-dom";
 import { auth } from "@/shared/lib/firebase";
+import { OwlLoader } from "@/shared/ui/owl_loader";
 
 // Pages behind sign-in. Sends visitors who aren't signed in — or haven't
 // finished sign-up (verified phone) — to the sign-in screen. The backend
@@ -22,6 +23,6 @@ export const RequireAuth = ({ children }: { children: ReactNode }) => {
     return () => unsubscribe();
   }, [navigate]);
 
-  if (!allowed) return <div className="loading-screen">Loading…</div>;
+  if (!allowed) return <OwlLoader />;
   return <>{children}</>;
 };

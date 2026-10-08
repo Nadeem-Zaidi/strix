@@ -41,6 +41,8 @@ export const RunDialog = ({ target, onClose }: { target: RunTarget; onClose: () 
   const [shot, setShot] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
+  // The run's own chat — Stop cancels only this run, never other chats' replies.
+  const runSessionRef = useRef<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const startedAt = useRef(0);
@@ -127,6 +129,7 @@ export const RunDialog = ({ target, onClose }: { target: RunTarget; onClose: () 
     startedAt.current = Date.now();
     try {
       const session = await api.newSession();
+      runSessionRef.current = session.id;
       setSessionId(session.id);
       const message = { type: "message", role: "user" as const, content: [{ type: "text" as const, text }] };
       if (target.kind === "native") await api.sendMessage(session.id, message, onChunk, undefined, undefined, target.id);
@@ -141,7 +144,7 @@ export const RunDialog = ({ target, onClose }: { target: RunTarget; onClose: () 
   };
 
   const stop = () => {
-    void api.abortChat();
+    if (runSessionRef.current) void api.abortChat(runSessionRef.current);
     setPhase("done");
   };
 
@@ -152,7 +155,7 @@ export const RunDialog = ({ target, onClose }: { target: RunTarget; onClose: () 
   };
 
   const close = () => {
-    if (phase === "running") void api.abortChat();
+    if (phase === "running" && runSessionRef.current) void api.abortChat(runSessionRef.current);
     onClose();
   };
 

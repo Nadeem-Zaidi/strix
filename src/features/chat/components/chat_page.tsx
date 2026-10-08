@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSelector } from "react-redux";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { ArrowUp, BookOpenText, Lightbulb, Search, Square, X, Zap } from "lucide-react";
+import { ArrowUp, BookOpenText, Lightbulb, Pin, PinOff, Search, Square, X, Zap } from "lucide-react";
 import { useAppDispatch, useAppSelector } from "@/app/store";
 import { auth } from "@/shared/lib/firebase";
 import { agentsApi } from "@/features/agents/api/agents_api";
@@ -28,10 +28,15 @@ import { updateChatMode } from "@/features/chat/state/chat_mode_slice";
 import { api, type StreamChunk } from "@/features/chat/api/chat_api";
 import { BotMessage } from "@/features/chat/components/bot_message";
 import { formatTokens } from "@/features/insights/api/insights_api";
-import { appendCacheMessage, clearCacheMessage, closeWindow, endSessionStream, loadMessages, loadSessions, newSession, openWindow, replaceLastMessage, setActiveSession, setChatMode, startSessionStream } from "@/features/chat/state/session_slice";
+import { appendCacheMessage, clearCacheMessage, closeWindow, endSessionStream, loadMessages, loadSessions, newSession, openWindow, replaceLastMessage, setActiveSession, setChatMode, setSessionPinned, startSessionStream } from "@/features/chat/state/session_slice";
 import { FileComponent } from "@/features/chat/components/file_component";
 import { CodeInterpreterCard } from "@/features/chat/components/code_interpreter_card";
 import { ToolCallCard } from "@/features/chat/components/tool_call_card";
+import { ArtifactCard } from "@/features/artifacts/components/artifact_card";
+import { ArtifactPanel } from "@/features/artifacts/components/artifact_panel";
+import { ARTIFACT_TOOLS, parseArtifactRef, type ArtifactRef } from "@/features/artifacts/api/artifacts_api";
+import { MEMORY_TOOLS, memoryEvent, memoryEventsForAssistantMessage, type MemoryEvent } from "@/features/chat/lib/memory_events";
+import { MemoryNote } from "@/features/chat/components/memory_note";
 import { ThinkingOwl, OwlMark } from "@/shared/ui/owl_icon";
 import { ModelSelector } from "@/features/chat/components/model_selector";
 import { useLLMProvider } from "@/features/chat/hooks/use_llm_provider";
@@ -116,6 +121,26 @@ function getSourcesForAssistantMessage(messages: LLMMessage[], assistantIndex: n
   return Array.from(sources);
 }
 
+// Documents (artifacts) created or updated in the turn that ends with this
+// assistant message — rebuilt from the saved tool outputs after a reload.
+function getArtifactsForAssistantMessage(messages: LLMMessage[], assistantIndex: number): ArtifactRef[] {
+  let start = 0;
+  for (let i = assistantIndex - 1; i >= 0; i--) {
+    if ((messages[i] as any).role === "user") { start = i + 1; break; }
+  }
+  const names: Record<string, string> = {};
+  const byId = new Map<string, ArtifactRef>();
+  for (let i = start; i < assistantIndex; i++) {
+    const m = messages[i] as any;
+    if (m.role === "tool_call" && m.tool_call_id && m.name) names[m.tool_call_id] = m.name;
+    if (m.role === "tool_call_output" && m.tool_call_id && ARTIFACT_TOOLS.has(names[m.tool_call_id])) {
+      const ref = parseArtifactRef(m.output);
+      if (ref) byId.set(ref.artifact_id, ref);   // latest version wins
+    }
+  }
+  return [...byId.values()];
+}
+
 // Shows a provider agent with the same header/welcome/chip as a regular agent.
 const nativeAsAgent = (n: NativeAgent): Agent => ({
   id: n.id,
@@ -152,6 +177,8 @@ type SessionStreamState = {
   activeTools: Record<string, ToolInfo>;
   mcpStatus: string;
   sources: string[];
+  artifacts: ArtifactRef[];
+  memories: MemoryEvent[];
   usage?: MessageUsage;
 };
 
@@ -180,6 +207,12 @@ export const ChatPage = ({
   const [uploadResults, setUploadResults] = useState<(LLMFileUploadResponse | undefined)[]>([]);
   const [uploadErrors, setUploadErrors] = useState<(string | undefined)[]>([]);
   const [activeTools, setActiveTools] = useState<Record<string, ToolInfo>>({});
+  // The document open in the side panel (and a counter to reload it after a new version).
+  const [openArtifact, setOpenArtifact] = useState<{ id: string; version?: number } | null>(null);
+  const [artifactRefresh, setArtifactRefresh] = useState(0);
+  useEffect(() => { setOpenArtifact(null); }, [activeSessionId]);
+  const toggleArtifact = (ref: ArtifactRef) =>
+    setOpenArtifact((cur) => (cur?.id === ref.artifact_id ? null : { id: ref.artifact_id }));
   // Provider agents' hosted browser: pending approvals and the latest screenshot.
   const [browserApprovals, setBrowserApprovals] = useState<BrowserApproval[]>([]);
   const [browserShot, setBrowserShot] = useState<string | null>(null);
@@ -376,6 +409,8 @@ export const ChatPage = ({
       role: "assistant",
       content: [{ type: "text", text }, ...extraParts],
       sources: sessionState.sources.length ? sessionState.sources : undefined,
+      artifacts: sessionState.artifacts.length ? sessionState.artifacts : undefined,
+      memories: sessionState.memories.length ? sessionState.memories : undefined,
       ...(sessionState.usage ? { metadata: { usage: sessionState.usage } } : {}),
     } as LLMMessage;
 
@@ -612,6 +647,8 @@ export const ChatPage = ({
       activeTools: {},
       mcpStatus: "",
       sources: [],
+      artifacts: [],
+      memories: [],
     };
     dispatch(startSessionStream({ sessionId: sessionIdForStream }));
 
@@ -657,6 +694,24 @@ export const ChatPage = ({
         };
         if (isVisible()) setActiveTools(s.activeTools);
         const calledToolName = s.activeTools[chunk.tool_call_id]?.name;
+        if (MEMORY_TOOLS.has(calledToolName)) {
+          const event = memoryEvent(calledToolName, s.activeTools[chunk.tool_call_id]?.args, chunk.output);
+          if (event) {
+            s.memories = [...s.memories, event];
+            updateBotMessage(s, s.buffer);
+          }
+        }
+        if (ARTIFACT_TOOLS.has(calledToolName)) {
+          const ref = parseArtifactRef(chunk.output);
+          if (ref) {
+            s.artifacts = [...s.artifacts.filter((a) => a.artifact_id !== ref.artifact_id), ref];
+            updateBotMessage(s, s.buffer);
+            if (isVisible()) {
+              setOpenArtifact({ id: ref.artifact_id });
+              setArtifactRefresh((n) => n + 1);
+            }
+          }
+        }
         if (calledToolName === RAG_TOOL_NAME) {
           const filenames = extractSourceFilenames(chunk.output);
           if (filenames.length) {
@@ -838,12 +893,12 @@ export const ChatPage = ({
   const cancelStream = async () => {
     if (!activeSessionId) return;
 
-    await api.abortChat();
+    await api.abortChat(activeSessionId);
     resetSessionStream(activeSessionId);
   };
 
   return (
-    <div className={`chat_plane ${className}`}>
+    <div className={`chat_plane ${className} ${openArtifact ? "has_artifact" : ""}`}>
       {showTopBar && (
         <div className="chat_topbar">
           <span className="chat_topbar__brand" title={title}>
@@ -855,6 +910,23 @@ export const ChatPage = ({
               <Zap size={12} /> {formatTokens(chatTokens)} tokens
             </button>
           )}
+          {activeSessionId && chatMode && (() => {
+            const current = sessions.find((x) => x.id === activeSessionId);
+            if (!current) return null;
+            const pinned = !!current.pinned_at;
+            return (
+              <button
+                type="button"
+                className={`topbar_action topbar_pin ${pinned ? "is_pinned" : ""}`}
+                onClick={() => void dispatch(setSessionPinned({ sessionId: current.id, pinned: !pinned }))}
+                title={pinned ? "Unpin this chat" : "Pin this chat to favourites"}
+                aria-pressed={pinned}
+              >
+                {pinned ? <PinOff size={15} /> : <Pin size={15} />}
+                <span>{pinned ? "Pinned" : "Pin"}</span>
+              </button>
+            );
+          })()}
           {activeSessionId && chatMode && (
             <button type="button" className="topbar_action" onClick={() => setContinueOpen(true)} title="Continue this chat on your phone">
               <FontAwesomeIcon icon={faWhatsapp} />
@@ -932,10 +1004,19 @@ export const ChatPage = ({
               const msgSources = liveSources && liveSources.length
                 ? liveSources
                 : getSourcesForAssistantMessage(cacheMessages, i);
+              const liveArtifacts = (msg as any).artifacts as ArtifactRef[] | undefined;
+              const msgArtifacts = liveArtifacts && liveArtifacts.length
+                ? liveArtifacts
+                : getArtifactsForAssistantMessage(cacheMessages, i);
+              const liveMemories = (msg as any).memories as MemoryEvent[] | undefined;
+              const msgMemories = liveMemories && liveMemories.length
+                ? liveMemories
+                : memoryEventsForAssistantMessage(cacheMessages as any[], i);
               return (
                 <div key={i} className="assistant_turn">
                   {parts.map((m, j) => {
                     if (m.type === "output_text" || m.type === "text") {
+                      if (!(m as TextContent).text) return null;
                       return <BotMessage key={`${i}-${j}`} text={(m as TextContent).text} />;
                     }
                     if (m.type === "code_interpreter") {
@@ -952,6 +1033,19 @@ export const ChatPage = ({
                     }
                     return null;
                   })}
+                  {msgArtifacts.map((a) => (
+                    <ArtifactCard
+                      key={a.artifact_id}
+                      title={a.title}
+                      kind={a.kind}
+                      version={a.version}
+                      open={openArtifact?.id === a.artifact_id}
+                      onToggle={() => toggleArtifact(a)}
+                    />
+                  ))}
+                  {msgMemories.length > 0 && (
+                    <MemoryNote events={msgMemories} onManage={() => navigate("/settings/memory")} />
+                  )}
                   {msgSources && msgSources.length > 0 && (
                     <SourceChips
                       sources={msgSources}
@@ -989,7 +1083,9 @@ export const ChatPage = ({
           )}
 
           {Object.entries(activeTools).map(([callId, tool]) =>
-            tool.source === "code_interpreter" ? (
+            ARTIFACT_TOOLS.has(tool.name) ? (
+              tool.done ? null : <ArtifactCard key={callId} title="" pending />
+            ) : MEMORY_TOOLS.has(tool.name) ? null : tool.source === "code_interpreter" ? (
               <CodeInterpreterCard
                 key={callId}
                 code={tool.code ?? ""}
@@ -1017,6 +1113,15 @@ export const ChatPage = ({
           <div ref={bottomAnchorRef} />
         </div>
       </div>
+
+      {openArtifact && (
+        <ArtifactPanel
+          key={`${openArtifact.id}:${artifactRefresh}`}
+          artifactId={openArtifact.id}
+          version={openArtifact.version}
+          onClose={() => setOpenArtifact(null)}
+        />
+      )}
 
       <div className={`chat_input_wrapper ${!chatMode ? "centered" : ""}`}>
         {!chatMode && (

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api, type LLMProviderOption } from "@/features/chat/api/chat_api";
+import { MODELS_CHANGED } from "@/features/settings/api/settings_api";
 
 const STORAGE_KEY = "llm_selection";
 
@@ -20,6 +21,14 @@ function readSaved(): Partial<LLMSelection> | null {
 export function useLLMProvider() {
   const [providers, setProviders] = useState<LLMProviderOption[]>([]);
   const [selection, setSelectionState] = useState<LLMSelection | undefined>(undefined);
+
+  // Bumped when the user adds/changes their own API keys, to refetch the list.
+  const [version, setVersion] = useState(0);
+  useEffect(() => {
+    const bump = () => setVersion((v) => v + 1);
+    window.addEventListener(MODELS_CHANGED, bump);
+    return () => window.removeEventListener(MODELS_CHANGED, bump);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -42,7 +51,7 @@ export function useLLMProvider() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [version]);
 
   const setSelection = (next: LLMSelection) => {
     setSelectionState(next);

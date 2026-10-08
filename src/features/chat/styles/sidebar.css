@@ -746,3 +746,297 @@ button.sidebar_user_profile .user_info {
 }
 
 /* stays at the bottom when the chat list is hidden (collapsed) */
+
+/* ── Pinned (favourite) chats ── */
+.chat_section_label--pinned {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.chat_history_pin {
+    display: none;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    margin: -4px -4px -4px 0;
+    padding: 0;
+    border: none;
+    border-radius: 6px;
+    background: none;
+    color: var(--text-sec);
+    cursor: pointer;
+}
+
+.chat_history_pin:hover {
+    background: var(--bg-active);
+    color: var(--accent);
+}
+
+/* The pin button takes the time's place while the row is hovered or focused. */
+.chat_history_item:hover .chat_history_pin,
+.chat_history_item:focus-within .chat_history_pin,
+.chat_history_pin:focus-visible {
+    display: inline-flex;
+}
+
+.chat_history_item:hover .chat_history_time,
+.chat_history_item:focus-within .chat_history_time {
+    display: none;
+}
+
+.chat_history_pin:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+}
+
+.chat_pin_error {
+    margin: 8px 10px 0;
+    padding: 6px 8px;
+    border-radius: 6px;
+    background: var(--danger-soft);
+    color: var(--danger);
+    font-size: 12px;
+}
+
+/* Touch screens have no hover: keep the pin reachable on every row. */
+@media (hover: none) {
+    .chat_history_pin {
+        display: inline-flex;
+    }
+}
+
+/* ── "More" — less-used pages, expand / collapse ── */
+.menu_item--more {
+    color: var(--text-sec);
+}
+
+.menu_item--more:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
+}
+
+.menu_more_chevron {
+    transition: transform 0.2s ease;
+}
+
+.menu_more_chevron.is_open {
+    transform: rotate(180deg);
+}
+
+/* Height animates from 0 to its content (grid rows 0fr → 1fr). */
+.menu_more {
+    display: grid;
+    grid-template-rows: 0fr;
+    transition: grid-template-rows 0.22s ease, opacity 0.18s ease;
+    opacity: 0;
+    list-style: none;
+}
+
+.menu_more.is_open {
+    grid-template-rows: 1fr;
+    opacity: 1;
+}
+
+.menu_more > ul {
+    min-height: 0;
+    overflow: hidden;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.menu_more:not(.is_open) {
+    pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .menu_more,
+    .menu_more_chevron {
+        transition: none;
+    }
+}
+
+/* ── Resizable width (drag the right edge; desktop only) ── */
+.sidebar_resizer {
+    display: none;
+}
+
+@media (min-width: 861px) {
+    .sidebar {
+        position: relative;
+    }
+
+    .sidebar_resizer {
+        display: block;
+        position: absolute;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 5;
+        width: 7px;
+        cursor: col-resize;
+        touch-action: none;
+    }
+
+    /* A thin line appears on hover / while dragging / on keyboard focus. */
+    .sidebar_resizer::after {
+        content: "";
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        right: 0;
+        width: 2px;
+        background: var(--accent);
+        opacity: 0;
+        transition: opacity 0.15s ease 0.1s;
+    }
+
+    .sidebar_resizer:hover::after,
+    .sidebar.is_resizing .sidebar_resizer::after,
+    .sidebar_resizer:focus-visible::after {
+        opacity: 0.55;
+    }
+
+    .sidebar_resizer:focus-visible {
+        outline: none;
+    }
+
+    /* Follow the pointer exactly while dragging. */
+    .sidebar.is_resizing,
+    .sidebar.is_resizing .menu_item {
+        transition: none !important;
+    }
+}
+
+/* While dragging: no text selection, and frames (document previews) can't
+   swallow the pointer. */
+body.is_resizing_sidebar {
+    cursor: col-resize;
+    user-select: none;
+}
+
+body.is_resizing_sidebar iframe {
+    pointer-events: none;
+}
+
+/* ── Chat list: loading skeleton (shimmer), empty/error note, "View all" ── */
+.chat_skeleton {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+}
+
+.chat_skeleton_row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 9px 10px;
+    animation: chat_skeleton_in 0.3s ease both;
+}
+
+.chat_skeleton_bar,
+.chat_skeleton_time {
+    display: block;
+    height: 10px;
+    border-radius: 6px;
+    background: linear-gradient(
+        90deg,
+        var(--bg-active) 0%,
+        var(--bg-active) 35%,
+        var(--bg-subtle) 50%,
+        var(--bg-active) 65%,
+        var(--bg-active) 100%
+    );
+    background-size: 300% 100%;
+    animation: chat_shimmer 1.4s ease-in-out infinite;
+}
+
+.chat_skeleton_time {
+    width: 30px;
+    margin-left: auto;
+    flex-shrink: 0;
+    opacity: 0.7;
+}
+
+@keyframes chat_shimmer {
+    from { background-position: 100% 0; }
+    to { background-position: 0 0; }
+}
+
+@keyframes chat_skeleton_in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.chat_list_note {
+    padding: 8px 10px;
+    font-size: 13px;
+    color: var(--text-ter);
+    white-space: nowrap;
+}
+
+.chat_list_link {
+    background: none;
+    border: none;
+    padding: 0;
+    font: inherit;
+    color: var(--accent);
+    cursor: pointer;
+    text-decoration: underline;
+}
+
+.chat_view_all {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    margin-top: 4px;
+    padding: 7px 10px;
+    border: none;
+    border-radius: 8px;
+    background: none;
+    font: inherit;
+    font-size: 13px;
+    color: var(--text-sec);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.12s, color 0.12s;
+}
+
+.chat_view_all:hover {
+    background: var(--bg-hover);
+    color: var(--accent);
+}
+
+.chat_view_all:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
+}
+
+.chat_view_all_count {
+    margin-left: auto;
+    font-size: 11px;
+    color: var(--text-ter);
+}
+
+.sidebar.collapsed .chat_skeleton,
+.sidebar.collapsed .chat_list_note,
+.sidebar.collapsed .chat_view_all {
+    display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .chat_skeleton_bar,
+    .chat_skeleton_time,
+    .chat_skeleton_row {
+        animation: none;
+    }
+}
+
+/* Quick clicks on More/Less shouldn't select its text. */
+.menu_item--more {
+    user-select: none;
+}

@@ -120,7 +120,10 @@ export const BillingPage = () => {
       <header className="ag_page__header">
         <div>
           <h1 className="ag_page__title">Plan & billing</h1>
-          <p className="ag_page__subtitle">Each plan includes a monthly token allowance for chats, agents, schedules, pipelines and WhatsApp.</p>
+          <p className="ag_page__subtitle">
+            Each plan includes a monthly token allowance for chats, agents, schedules, pipelines and WhatsApp.
+            Chats on <a href="/settings/keys">your own API keys</a> don't use it.
+          </p>
         </div>
       </header>
 
