@@ -13,8 +13,14 @@ import {
   faKey,
   faBookOpen,
   faBrain,
+  faFileWord,
   faSliders,
   faChevronDown,
+  faCubes,
+  faWallet,
+  faCode,
+  faSackDollar,
+  faLayerGroup,
 } from "@fortawesome/free-solid-svg-icons";
 import { faTelegram, faWhatsapp } from "@fortawesome/free-brands-svg-icons";
 import { useSelector } from "react-redux";
@@ -223,7 +229,7 @@ export const SideDrawer = ({ windowId = "chat-page" }: SideDrawerProps = {}) => 
     try { return localStorage.getItem(MORE_KEY) === "1"; } catch { return false; }
   });
   const [collapsedOn, setCollapsedOn] = useState<string | null>(null);
-  const onMorePage = location.pathname.startsWith("/pipelines") || location.pathname.startsWith("/skills");
+  const onMorePage = location.pathname.startsWith("/pipelines") || location.pathname.startsWith("/skills") || location.pathname.startsWith("/models");
   const showMore = moreOpen || (onMorePage && collapsedOn !== location.pathname);
   const toggleMore = () => {
     const next = !showMore;
@@ -479,6 +485,17 @@ export const SideDrawer = ({ windowId = "chat-page" }: SideDrawerProps = {}) => 
                 <span>Skills</span>
               </li>
               <li
+                className={`menu_item ${location.pathname.startsWith("/models") ? "menu_item--active" : ""}`}
+                tabIndex={showMore ? undefined : -1}
+                onClick={() => {
+                  closeMobileDrawer();
+                  navigate("/models");
+                }}
+              >
+                <FontAwesomeIcon icon={faCubes} className="menu_icon" />
+                <span>Models</span>
+              </li>
+              <li
                 className="menu_item"
                 tabIndex={showMore ? undefined : -1}
                 onClick={() => {
@@ -580,12 +597,31 @@ export const SideDrawer = ({ windowId = "chat-page" }: SideDrawerProps = {}) => 
               <button type="button" role="menuitem" className={location.pathname === "/settings/keys" ? "is_active" : ""} onClick={() => goFromMenu("/settings/keys")}>
                 <FontAwesomeIcon icon={faKey} className="account_menu__icon" /> API keys
               </button>
+              <button type="button" role="menuitem" className={location.pathname === "/credits" ? "is_active" : ""} onClick={() => goFromMenu("/credits")}>
+                <FontAwesomeIcon icon={faWallet} className="account_menu__icon" /> Credits
+              </button>
+              <button type="button" role="menuitem" className={location.pathname === "/developer" ? "is_active" : ""} onClick={() => goFromMenu("/developer")}>
+                <FontAwesomeIcon icon={faCode} className="account_menu__icon" /> Developer API
+              </button>
               <button type="button" role="menuitem" className={location.pathname === "/settings/memory" ? "is_active" : ""} onClick={() => goFromMenu("/settings/memory")}>
                 <FontAwesomeIcon icon={faBrain} className="account_menu__icon" /> Memory
+              </button>
+              <button type="button" role="menuitem" className={location.pathname === "/settings/documents" ? "is_active" : ""} onClick={() => goFromMenu("/settings/documents")}>
+                <FontAwesomeIcon icon={faFileWord} className="account_menu__icon" /> Document style
               </button>
               {isOwner && (
                 <button type="button" role="menuitem" className={location.pathname === "/settings/server" ? "is_active" : ""} onClick={() => goFromMenu("/settings/server")}>
                   <FontAwesomeIcon icon={faSliders} className="account_menu__icon" /> Server settings
+                </button>
+              )}
+              {isOwner && (
+                <button type="button" role="menuitem" className={location.pathname === "/admin/earnings" ? "is_active" : ""} onClick={() => goFromMenu("/admin/earnings")}>
+                  <FontAwesomeIcon icon={faSackDollar} className="account_menu__icon" /> Earnings
+                </button>
+              )}
+              {isOwner && (
+                <button type="button" role="menuitem" className={location.pathname === "/admin/catalog" ? "is_active" : ""} onClick={() => goFromMenu("/admin/catalog")}>
+                  <FontAwesomeIcon icon={faLayerGroup} className="account_menu__icon" /> Model catalogue
                 </button>
               )}
               <div className="account_menu__sep" />

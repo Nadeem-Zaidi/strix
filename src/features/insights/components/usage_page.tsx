@@ -192,7 +192,7 @@ export const UsagePage = () => {
                 <tbody>
                   {data.byModel.slice().sort((a, b) => b.total_tokens - a.total_tokens).map((m) => (
                     <tr key={`${m.provider}:${m.model}:${m.byok ? 1 : 0}`}>
-                      <td><span className="use_model">{m.model ?? "unknown"}</span><span className="ag_muted ag_small"> {m.provider === "anthropic" ? "Claude" : m.provider === "openai" ? "ChatGPT" : m.provider}{m.byok ? " · your key" : ""}</span></td>
+                      <td><span className="use_model">{m.model ?? "unknown"}</span><span className="ag_muted ag_small"> {m.provider === "anthropic" ? "Claude" : m.provider === "openai" ? "ChatGPT" : m.provider === "marketplace" ? "Marketplace" : m.provider}{m.provider === "marketplace" ? " · credits" : m.byok ? " · your key" : ""}</span></td>
                       <td>{formatTokens(m.total_tokens)}</td>
                       <td>{m.requests}</td>
                       <td>{m.cost_usd === null ? <span className="ag_muted">—</span> : fmtUsd(m.cost_usd)}</td>

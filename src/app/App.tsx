@@ -16,6 +16,13 @@ import { BillingPage } from "@/features/billing/components/billing_page";
 import { ApiKeysPage } from "@/features/settings/components/api_keys_page";
 import { MemoryPage } from "@/features/settings/components/memory_page";
 import { SkillsPage } from "@/features/skills/components/skills_page";
+import { DocumentStylePage } from "@/features/documents/components/document_style_page";
+import { ModelsPage } from "@/features/marketplace/components/models_page";
+import { ModelDetailPage } from "@/features/marketplace/components/model_detail_page";
+import { CreditsPage } from "@/features/marketplace/components/credits_page";
+import { DeveloperPage } from "@/features/marketplace/components/developer_page";
+import { EarningsPage } from "@/features/marketplace/components/earnings_page";
+import { CatalogAdminPage } from "@/features/marketplace/components/catalog_admin_page";
 import { ServerSettingsPage } from "@/features/settings/components/server_settings_page";
 
 // Everything except "/" needs a signed-in user with a verified phone.
@@ -46,6 +53,13 @@ function App() {
           <Route path="/settings/keys" element={<ApiKeysPage />} />
           <Route path="/settings/memory" element={<MemoryPage />} />
           <Route path="/skills" element={<SkillsPage />} />
+          <Route path="/settings/documents" element={<DocumentStylePage />} />
+          <Route path="/models" element={<ModelsPage />} />
+          <Route path="/models/:author/:slug" element={<ModelDetailPage />} />
+          <Route path="/credits" element={<CreditsPage />} />
+          <Route path="/developer" element={<DeveloperPage />} />
+          <Route path="/admin/earnings" element={<EarningsPage />} />
+          <Route path="/admin/catalog" element={<CatalogAdminPage />} />
           <Route path="/settings/server" element={<ServerSettingsPage />} />
         </Route>
       </Route>

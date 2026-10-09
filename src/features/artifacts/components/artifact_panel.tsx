@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { Check, Copy, Download, ExternalLink, LoaderCircle, Maximize2, Minimize2, X } from "lucide-react";
+import { Check, Code2, Copy, Download, ExternalLink, FileText, LoaderCircle, Maximize2, Minimize2, X } from "lucide-react";
+import { PanelResizer } from "@/features/artifacts/components/panel_resizer";
 import { BotMessage } from "@/features/chat/components/bot_message";
 import { artifactsApi, type Artifact } from "@/features/artifacts/api/artifacts_api";
 import { escapeAttr, sandboxedHtml } from "@/features/artifacts/lib/sandbox";
@@ -79,9 +80,17 @@ export const ArtifactPanel = ({ artifactId, version, onClose }: Props) => {
 
   return (
     <aside className={`art_panel ${full ? "is_full" : ""}`} aria-label="Document">
+      <PanelResizer />
       <header className="art_panel__head">
         <div className="art_panel__title">
-          <strong title={art?.title}>{art?.title ?? "Loading…"}</strong>
+          <span className={`art_panel__chip art_panel__chip--${art?.kind ?? "html"}`} aria-hidden="true">
+            {art?.kind === "markdown" ? <FileText size={17} /> : <Code2 size={17} />}
+          </span>
+          <div className="art_panel__heading">
+            <strong title={art?.title}>{art?.title ?? "Loading…"}</strong>
+            <span className="art_panel__meta">
+              {art ? (art.kind === "html" ? "Web page" : "Document") : ""}
+              {art && art.versions.length <= 1 && art.version > 1 ? ` · v${art.version}` : ""}
           {art && art.versions.length > 1 && (
             <select
               id="art_version"
@@ -97,17 +106,21 @@ export const ArtifactPanel = ({ artifactId, version, onClose }: Props) => {
               ))}
             </select>
           )}
+            </span>
+          </div>
         </div>
         <div className="art_panel__actions">
           <div className="art_tabs" role="tablist">
             <button type="button" role="tab" aria-selected={tab === "preview"} className={tab === "preview" ? "is_active" : ""} onClick={() => setTab("preview")}>Preview</button>
             <button type="button" role="tab" aria-selected={tab === "code"} className={tab === "code" ? "is_active" : ""} onClick={() => setTab("code")}>{art?.kind === "markdown" ? "Markdown" : "Code"}</button>
           </div>
-          <button type="button" className="art_icon" onClick={() => void copy()} title="Copy" aria-label="Copy" disabled={!art}>{copied ? <Check size={16} /> : <Copy size={16} />}</button>
-          <button type="button" className="art_icon" onClick={download} title="Download" aria-label="Download" disabled={!art}><Download size={16} /></button>
-          {art?.kind === "html" && <button type="button" className="art_icon" onClick={openInTab} title="Open in a new tab" aria-label="Open in a new tab"><ExternalLink size={16} /></button>}
-          <button type="button" className="art_icon" onClick={() => setFull((f) => !f)} title={full ? "Exit full screen" : "Full screen"} aria-label={full ? "Exit full screen" : "Full screen"}>{full ? <Minimize2 size={16} /> : <Maximize2 size={16} />}</button>
-          <button type="button" className="art_icon" onClick={onClose} title="Close" aria-label="Close"><X size={17} /></button>
+          <div className="art_toolbar">
+            <button type="button" className="art_icon" onClick={() => void copy()} title="Copy" aria-label="Copy" disabled={!art}>{copied ? <Check size={16} /> : <Copy size={16} />}</button>
+            <button type="button" className="art_icon" onClick={download} title="Download" aria-label="Download" disabled={!art}><Download size={16} /></button>
+            {art?.kind === "html" && <button type="button" className="art_icon" onClick={openInTab} title="Open in a new tab" aria-label="Open in a new tab"><ExternalLink size={16} /></button>}
+            <button type="button" className="art_icon" onClick={() => setFull((f) => !f)} title={full ? "Exit full screen" : "Full screen"} aria-label={full ? "Exit full screen" : "Full screen"}>{full ? <Minimize2 size={16} /> : <Maximize2 size={16} />}</button>
+          </div>
+          <button type="button" className="art_icon art_icon--close" onClick={onClose} title="Close" aria-label="Close"><X size={18} /></button>
         </div>
       </header>
 

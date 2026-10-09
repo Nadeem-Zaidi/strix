@@ -33,6 +33,9 @@
 @import "../features/telegram/styles/telegram.css";
 @import "../features/skills/styles/skills.css";
 @import "../features/pipelines/styles/workflows.css";
+@import "../features/documents/styles/documents.css";
+@import "../features/charts/styles/charts.css";
+@import "../features/marketplace/styles/marketplace.css";
 @import "../features/agents/styles/agents.css";
 @import "../features/pipelines/styles/pipelines.css";
 @import "../features/native_agents/styles/native_agents.css";

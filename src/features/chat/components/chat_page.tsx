@@ -37,6 +37,11 @@ import { ArtifactPanel } from "@/features/artifacts/components/artifact_panel";
 import { ARTIFACT_TOOLS, parseArtifactRef, type ArtifactRef } from "@/features/artifacts/api/artifacts_api";
 import { MEMORY_TOOLS, memoryEvent, memoryEventsForAssistantMessage, type MemoryEvent } from "@/features/chat/lib/memory_events";
 import { MemoryNote } from "@/features/chat/components/memory_note";
+import { DOCUMENT_TOOLS, filesForAssistantMessage, generatedFileFrom, type GeneratedFile } from "@/features/documents/api/documents_api";
+import { GeneratedFileCard } from "@/features/documents/components/generated_file_card";
+import { DocumentViewer } from "@/features/documents/components/document_viewer";
+import { CHART_TOOL, chartFrom, chartsForAssistantMessage, type ChartSpec } from "@/features/charts/lib/chart_spec";
+import { ChartCard, ChartSkeleton } from "@/features/charts/components/chart_card";
 import { ThinkingOwl, OwlMark } from "@/shared/ui/owl_icon";
 import { ModelSelector } from "@/features/chat/components/model_selector";
 import { useLLMProvider } from "@/features/chat/hooks/use_llm_provider";
@@ -179,6 +184,8 @@ type SessionStreamState = {
   sources: string[];
   artifacts: ArtifactRef[];
   memories: MemoryEvent[];
+  files: GeneratedFile[];
+  charts: ChartSpec[];
   usage?: MessageUsage;
 };
 
@@ -210,9 +217,17 @@ export const ChatPage = ({
   // The document open in the side panel (and a counter to reload it after a new version).
   const [openArtifact, setOpenArtifact] = useState<{ id: string; version?: number } | null>(null);
   const [artifactRefresh, setArtifactRefresh] = useState(0);
-  useEffect(() => { setOpenArtifact(null); }, [activeSessionId]);
-  const toggleArtifact = (ref: ArtifactRef) =>
+  // A generated Word/Excel file open in the same side panel (one panel at a time).
+  const [openFile, setOpenFile] = useState<GeneratedFile | null>(null);
+  useEffect(() => { setOpenArtifact(null); setOpenFile(null); }, [activeSessionId]);
+  const toggleArtifact = (ref: ArtifactRef) => {
+    setOpenFile(null);
     setOpenArtifact((cur) => (cur?.id === ref.artifact_id ? null : { id: ref.artifact_id }));
+  };
+  const toggleFile = (file: GeneratedFile) => {
+    setOpenArtifact(null);
+    setOpenFile((cur) => (cur?.id === file.id ? null : file));
+  };
   // Provider agents' hosted browser: pending approvals and the latest screenshot.
   const [browserApprovals, setBrowserApprovals] = useState<BrowserApproval[]>([]);
   const [browserShot, setBrowserShot] = useState<string | null>(null);
@@ -411,6 +426,8 @@ export const ChatPage = ({
       sources: sessionState.sources.length ? sessionState.sources : undefined,
       artifacts: sessionState.artifacts.length ? sessionState.artifacts : undefined,
       memories: sessionState.memories.length ? sessionState.memories : undefined,
+      files: sessionState.files.length ? sessionState.files : undefined,
+      charts: sessionState.charts.length ? sessionState.charts : undefined,
       ...(sessionState.usage ? { metadata: { usage: sessionState.usage } } : {}),
     } as LLMMessage;
 
@@ -649,6 +666,8 @@ export const ChatPage = ({
       sources: [],
       artifacts: [],
       memories: [],
+      files: [],
+      charts: [],
     };
     dispatch(startSessionStream({ sessionId: sessionIdForStream }));
 
@@ -694,6 +713,24 @@ export const ChatPage = ({
         };
         if (isVisible()) setActiveTools(s.activeTools);
         const calledToolName = s.activeTools[chunk.tool_call_id]?.name;
+        if (calledToolName === CHART_TOOL) {
+          const chart = chartFrom(chunk.output);
+          if (chart) {
+            s.charts = [...s.charts, chart];
+            updateBotMessage(s, s.buffer);
+          }
+        }
+        if (DOCUMENT_TOOLS.has(calledToolName)) {
+          const file = generatedFileFrom(chunk.output);
+          if (file) {
+            s.files = [...s.files, file];
+            updateBotMessage(s, s.buffer);
+            if (isVisible()) {
+              setOpenArtifact(null);
+              setOpenFile(file);
+            }
+          }
+        }
         if (MEMORY_TOOLS.has(calledToolName)) {
           const event = memoryEvent(calledToolName, s.activeTools[chunk.tool_call_id]?.args, chunk.output);
           if (event) {
@@ -707,6 +744,7 @@ export const ChatPage = ({
             s.artifacts = [...s.artifacts.filter((a) => a.artifact_id !== ref.artifact_id), ref];
             updateBotMessage(s, s.buffer);
             if (isVisible()) {
+              setOpenFile(null);
               setOpenArtifact({ id: ref.artifact_id });
               setArtifactRefresh((n) => n + 1);
             }
@@ -898,7 +936,7 @@ export const ChatPage = ({
   };
 
   return (
-    <div className={`chat_plane ${className} ${openArtifact ? "has_artifact" : ""}`}>
+    <div className={`chat_plane ${className} ${openArtifact || openFile ? "has_artifact" : ""}`}>
       {showTopBar && (
         <div className="chat_topbar">
           <span className="chat_topbar__brand" title={title}>
@@ -1008,6 +1046,10 @@ export const ChatPage = ({
               const msgArtifacts = liveArtifacts && liveArtifacts.length
                 ? liveArtifacts
                 : getArtifactsForAssistantMessage(cacheMessages, i);
+              const liveCharts = (msg as any).charts as ChartSpec[] | undefined;
+              const msgCharts = liveCharts && liveCharts.length ? liveCharts : chartsForAssistantMessage(cacheMessages as any[], i);
+              const liveFiles = (msg as any).files as GeneratedFile[] | undefined;
+              const msgFiles = liveFiles && liveFiles.length ? liveFiles : filesForAssistantMessage(cacheMessages as any[], i);
               const liveMemories = (msg as any).memories as MemoryEvent[] | undefined;
               const msgMemories = liveMemories && liveMemories.length
                 ? liveMemories
@@ -1033,6 +1075,7 @@ export const ChatPage = ({
                     }
                     return null;
                   })}
+                  {msgCharts.map((c, k) => <ChartCard key={`chart-${k}`} spec={c} />)}
                   {msgArtifacts.map((a) => (
                     <ArtifactCard
                       key={a.artifact_id}
@@ -1043,6 +1086,7 @@ export const ChatPage = ({
                       onToggle={() => toggleArtifact(a)}
                     />
                   ))}
+                  {msgFiles.map((f) => <GeneratedFileCard key={f.id} file={f} open={openFile?.id === f.id} onOpen={() => toggleFile(f)} />)}
                   {msgMemories.length > 0 && (
                     <MemoryNote events={msgMemories} onManage={() => navigate("/settings/memory")} />
                   )}
@@ -1073,6 +1117,9 @@ export const ChatPage = ({
                 {streamErrorCode === "quota_exceeded" && (
                   <button type="button" className="chat_quota" onClick={() => navigate("/billing")}>Upgrade</button>
                 )}
+                {streamErrorCode === "insufficient_credits" && (
+                  <button type="button" className="chat_quota" onClick={() => navigate("/credits")}>Add credits</button>
+                )}
               </span>
             </div>
           )}
@@ -1085,7 +1132,11 @@ export const ChatPage = ({
           {Object.entries(activeTools).map(([callId, tool]) =>
             ARTIFACT_TOOLS.has(tool.name) ? (
               tool.done ? null : <ArtifactCard key={callId} title="" pending />
-            ) : MEMORY_TOOLS.has(tool.name) ? null : tool.source === "code_interpreter" ? (
+            ) : MEMORY_TOOLS.has(tool.name) ? null : tool.name === CHART_TOOL ? (
+              tool.done ? null : <ChartSkeleton key={callId} />
+            ) : DOCUMENT_TOOLS.has(tool.name) ? (
+              tool.done ? null : <GeneratedFileCard key={callId} pending kind={tool.name === "create_excel_file" ? "excel" : "word"} />
+            ) : tool.source === "code_interpreter" ? (
               <CodeInterpreterCard
                 key={callId}
                 code={tool.code ?? ""}
@@ -1122,6 +1173,7 @@ export const ChatPage = ({
           onClose={() => setOpenArtifact(null)}
         />
       )}
+      {openFile && <DocumentViewer key={openFile.id} file={openFile} onClose={() => setOpenFile(null)} />}
 
       <div className={`chat_input_wrapper ${!chatMode ? "centered" : ""}`}>
         {!chatMode && (
@@ -1223,6 +1275,7 @@ export const ChatPage = ({
                   value={selection}
                   onChange={setSelection}
                   disabled={isStreaming}
+                  onBrowse={() => navigate("/models")}
                 />
               )}
             </div>
