@@ -1,9 +1,10 @@
 import { useRef } from "react";
-import { Trash2, X } from "lucide-react";
+import { Plus, Trash2, X } from "lucide-react";
 import { Field, Toggle } from "@/shared/ui/ui";
-import type { FlowNode, RuleOp } from "@/features/pipelines/api/pipelines_api";
+import type { FlowNode } from "@/features/pipelines/api/pipelines_api";
 import { providerLabel, stepKey, type StepAgent } from "@/features/pipelines/api/pipeline_agents";
-import { nodeLabel, RULE_LABEL, TYPE_LABEL, type StepNode } from "@/features/pipelines/lib/flow_graph";
+import { nodeLabel, TYPE_LABEL, type StepNode } from "@/features/pipelines/lib/flow_graph";
+import { RouterEditor, RuleRow, SourceSelect } from "@/features/pipelines/components/router_editor";
 
 type Props = {
   node: FlowNode;
@@ -12,9 +13,9 @@ type Props = {
   onChange: (node: FlowNode) => void;
   onDelete: () => void;
   onClose: () => void;
+  // Opens "New agent" for this step (Workflows editor).
+  onCreateAgent?: () => void;
 };
-
-const OPS: RuleOp[] = ["contains", "not_contains", "equals", "matches", "number_gt", "number_gte", "number_lt", "number_lte", "is_empty", "not_empty"];
 
 // A textarea with buttons that insert {{input}}, {{previous}} and earlier steps' outputs.
 const TemplateField = ({ label, value, onChange, before, rows = 4, hint, max = 4000 }: {
@@ -41,7 +42,7 @@ const TemplateField = ({ label, value, onChange, before, rows = 4, hint, max = 4
   );
 };
 
-export const FlowInspector = ({ node, agents, before, onChange, onDelete, onClose }: Props) => {
+export const FlowInspector = ({ node, agents, before, onChange, onDelete, onClose, onCreateAgent }: Props) => {
   const patch = (p: Partial<FlowNode>) => onChange({ ...node, ...p } as FlowNode);
   const regular = agents.filter((a) => a.kind === "agent");
   const native = agents.filter((a) => a.kind === "native");
@@ -62,8 +63,13 @@ export const FlowInspector = ({ node, agents, before, onChange, onDelete, onClos
         <>
           <Field label="Agent">
             <select className="ag_input" value={stepKey({ kind: node.agent_kind, agent_id: node.agent_id })}
-              onChange={(e) => { const [kind, ...rest] = e.target.value.split(":"); patch({ agent_kind: kind as "agent" | "native", agent_id: rest.join(":") }); }}>
+              onChange={(e) => {
+                if (e.target.value === "__new__") return onCreateAgent?.();
+                const [kind, ...rest] = e.target.value.split(":");
+                patch({ agent_kind: kind as "agent" | "native", agent_id: rest.join(":") });
+              }}>
               {!agents.some((a) => a.id === node.agent_id) && <option value={stepKey({ kind: node.agent_kind, agent_id: node.agent_id })}>Choose an agent…</option>}
+              {onCreateAgent && <option value="__new__">＋ Create a new agent…</option>}
               {regular.length > 0 && <optgroup label="Agents">{regular.map((a) => <option key={a.id} value={`agent:${a.id}`}>{a.icon} {a.name}</option>)}</optgroup>}
               {native.length > 0 && (
                 <optgroup label="Provider agents">
@@ -72,6 +78,9 @@ export const FlowInspector = ({ node, agents, before, onChange, onDelete, onClos
               )}
             </select>
           </Field>
+          {onCreateAgent && (
+            <button type="button" className="wf_link_btn" onClick={onCreateAgent}><Plus size={13} /> New agent for this step</button>
+          )}
           <TemplateField label="Task" value={node.instruction} onChange={(v) => patch({ instruction: v })} before={before}
             hint="Without any placeholder, the previous step's output is added at the end." />
         </>
@@ -87,33 +96,23 @@ export const FlowInspector = ({ node, agents, before, onChange, onDelete, onClos
               <input type="radio" checked={node.mode === "ai"} onChange={() => onChange({ id: node.id, type: "condition", position: node.position, label: node.label, mode: "ai", source: node.source, question: "" })} /> Ask AI (yes/no)
             </label>
           </div>
-          <Field label="Look at">
-            <select className="ag_input" value={node.source} onChange={(e) => patch({ source: e.target.value })}>
-              <option value="previous">Previous step's output</option>
-              <option value="input">The run's input</option>
-              {before.filter((b) => b.data.node.type === "agent").map((b) => <option key={b.id} value={`node.${b.id}`}>Output of “{nodeLabel(b.data.node)}”</option>)}
-            </select>
-          </Field>
+          <SourceSelect value={node.source} before={before} onChange={(source) => patch({ source })} />
           {node.mode === "rule" ? (
-            <div className="wf_rule">
-              <select className="ag_input" value={node.op} onChange={(e) => patch({ op: e.target.value as RuleOp })}>
-                {OPS.map((op) => <option key={op} value={op}>{RULE_LABEL[op]}</option>)}
-              </select>
-              {!["is_empty", "not_empty"].includes(node.op) && (
-                <input className="ag_input" value={node.value} maxLength={500} placeholder={node.op.startsWith("number") ? "50000" : node.op === "matches" ? "INV-\\d+" : "urgent"} onChange={(e) => patch({ value: e.target.value })} />
-              )}
-            </div>
+            <RuleRow rule={{ field: node.field, op: node.op, value: node.value }}
+              onChange={(r) => onChange({ id: node.id, type: "condition", position: node.position, label: node.label, mode: "rule", source: node.source, ...(r.field ? { field: r.field } : {}), op: r.op, value: r.value })} />
           ) : (
             <Field label="Question" hint="Answered YES or NO by your default model.">
               <input className="ag_input" value={node.question} maxLength={500} placeholder="Is the invoice amount over ₹50,000?" onChange={(e) => patch({ question: e.target.value })} />
             </Field>
           )}
           {node.mode === "rule" && node.op.startsWith("number") && (
-            <p className="ag_muted ag_small">Uses the first amount with a currency (₹62,000, $1,500), otherwise the first plain number — ids like INV-7 are skipped.</p>
+            <p className="ag_muted ag_small">Leave the field empty to check the whole text. Numbers use the first amount with a currency (₹62,000, $1,500), otherwise the first plain number — ids like INV-7 are skipped.</p>
           )}
           <p className="ag_muted ag_small">Connect the <strong>Yes</strong> and <strong>No</strong> outputs to the next steps.</p>
         </>
       )}
+
+      {node.type === "router" && <RouterEditor node={node} before={before} onChange={onChange} />}
 
       {node.type === "approval" && (
         <>

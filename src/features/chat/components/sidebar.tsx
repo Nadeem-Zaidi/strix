@@ -8,6 +8,8 @@ import {
   faRightFromBracket,
   faRobot,
   faDiagramProject,
+  faWandMagicSparkles,
+  faBell,
   faChartColumn,
   faCreditCard,
   faKey,
@@ -46,6 +48,7 @@ import { WhatsAppConnect } from "@/features/whatsapp/components/whatsapp_connect
 import { TelegramConnect } from "@/features/telegram/components/telegram_connect";
 import { BILLING_CHANGED, billingApi } from "@/features/billing/api/billing_api";
 import { settingsApi } from "@/features/settings/api/settings_api";
+import { UnreadAlertsBadge } from "@/features/automations/components/unread_badge";
 
 // Compact "last active" label for a Recents row: time today, "Yesterday",
 // weekday within the week, then a short date (with year if not this year).
@@ -229,7 +232,7 @@ export const SideDrawer = ({ windowId = "chat-page" }: SideDrawerProps = {}) => 
     try { return localStorage.getItem(MORE_KEY) === "1"; } catch { return false; }
   });
   const [collapsedOn, setCollapsedOn] = useState<string | null>(null);
-  const onMorePage = location.pathname.startsWith("/pipelines") || location.pathname.startsWith("/skills") || location.pathname.startsWith("/models");
+  const onMorePage = location.pathname.startsWith("/pipelines") || location.pathname.startsWith("/studio") || location.pathname.startsWith("/reminders") || location.pathname.startsWith("/skills") || location.pathname.startsWith("/models");
   const showMore = moreOpen || (onMorePage && collapsedOn !== location.pathname);
   const toggleMore = () => {
     const next = !showMore;
@@ -462,6 +465,29 @@ export const SideDrawer = ({ windowId = "chat-page" }: SideDrawerProps = {}) => 
           </li>
           <li className={`menu_more ${showMore ? "is_open" : ""}`} id="sidebar_more_items" aria-hidden={!showMore}>
             <ul>
+              <li
+                className={`menu_item ${location.pathname.startsWith("/reminders") ? "menu_item--active" : ""}`}
+                tabIndex={showMore ? undefined : -1}
+                onClick={() => {
+                  closeMobileDrawer();
+                  navigate("/reminders");
+                }}
+              >
+                <FontAwesomeIcon icon={faBell} className="menu_icon" />
+                <span>Reminders & alerts</span>
+                <UnreadAlertsBadge />
+              </li>
+              <li
+                className={`menu_item ${location.pathname.startsWith("/studio") ? "menu_item--active" : ""}`}
+                tabIndex={showMore ? undefined : -1}
+                onClick={() => {
+                  closeMobileDrawer();
+                  navigate("/studio");
+                }}
+              >
+                <FontAwesomeIcon icon={faWandMagicSparkles} className="menu_icon" />
+                <span>Agent Studio</span>
+              </li>
               <li
                 className={`menu_item ${location.pathname.startsWith("/pipelines") ? "menu_item--active" : ""}`}
                 tabIndex={showMore ? undefined : -1}

@@ -4,18 +4,26 @@ import { BaseApi } from "@/shared/api/base_fetch";
 export type PipelineStep = { kind?: "agent" | "native"; agent_id: string; instruction: string };
 
 // ── workflows (backend core/flows/flow_types.ts) ──
-export type RuleOp = "contains" | "not_contains" | "equals" | "matches" | "number_gt" | "number_gte" | "number_lt" | "number_lte" | "is_empty" | "not_empty";
+export type RuleOp =
+  | "contains" | "not_contains" | "equals" | "matches" | "starts_with" | "ends_with" | "one_of"
+  | "number_gt" | "number_gte" | "number_lt" | "number_lte" | "number_between"
+  | "is_empty" | "not_empty" | "exists" | "not_exists";
+// `field` = optional JSON path in the text ("status", "order.total").
+export type Rule = { field?: string; op: RuleOp; value: string };
+export type RuleGroup = { match: "all" | "any"; rules: Rule[] };
+export type Route = { id: string; label: string; when: RuleGroup; description?: string };
 export type Position = { x: number; y: number };
 export type FlowNode =
   | { id: string; type: "start"; position: Position; label?: string }
   | { id: string; type: "agent"; position: Position; label?: string; agent_kind: "agent" | "native"; agent_id: string; instruction: string }
-  | { id: string; type: "condition"; position: Position; label?: string; mode: "rule"; source: string; op: RuleOp; value: string }
+  | { id: string; type: "condition"; position: Position; label?: string; mode: "rule"; source: string; field?: string; op: RuleOp; value: string }
   | { id: string; type: "condition"; position: Position; label?: string; mode: "ai"; source: string; question: string }
+  | { id: string; type: "router"; position: Position; label?: string; mode: "rule" | "ai"; source: string; routes: Route[]; instructions?: string }
   | { id: string; type: "approval"; position: Position; label?: string; message: string; notify: boolean }
   | { id: string; type: "notify"; position: Position; label?: string; message: string }
   | { id: string; type: "end"; position: Position; label?: string; output: string };
 export type NodeType = FlowNode["type"];
-export type Branch = "true" | "false" | "approved" | "rejected";
+export type Branch = "true" | "false" | "approved" | "rejected" | "default" | `route:${string}`;
 export type FlowEdge = { id: string; from: string; to: string; branch?: Branch };
 export type Flow = { version: 1; nodes: FlowNode[]; edges: FlowEdge[] };
 
@@ -30,6 +38,7 @@ export type FlowTraceEntry = {
   output?: string;
   error?: string;
   branch?: Branch;
+  branch_label?: string;
   decided_by?: string;
   comment?: string;
   started_at?: string;

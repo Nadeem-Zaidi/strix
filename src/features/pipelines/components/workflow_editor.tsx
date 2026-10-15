@@ -4,14 +4,17 @@ import {
   addEdge, applyEdgeChanges, applyNodeChanges, Background, Controls, ReactFlow,
   type Connection, type Edge, type EdgeChange, type NodeChange,
 } from "@xyflow/react";
-import { ArrowLeft, Bell, Bot, Check, Flag, GitFork, Info, ShieldCheck } from "lucide-react";
+import { ArrowLeft, Bell, Bot, Check, Flag, GitFork, Info, Route as RouteIcon, ShieldCheck } from "lucide-react";
 import { Button, ErrorNote } from "@/shared/ui/ui";
 import { loadStepAgents, stepKey, type StepAgent } from "@/features/pipelines/api/pipeline_agents";
 import { pipelinesApi, type Flow, type FlowNode, type NodeType, type PipelineRun } from "@/features/pipelines/api/pipelines_api";
-import { isTrace, newNode, starterFlow, statusByNode, toEdge, toFlow, toGraph, upstream, type StepNode } from "@/features/pipelines/lib/flow_graph";
+import { branchLabel, isTrace, newNode, starterFlow, statusByNode, toEdge, toFlow, toGraph, upstream, type StepNode } from "@/features/pipelines/lib/flow_graph";
 import { StepNodeCard } from "@/features/pipelines/components/flow_nodes";
 import { FlowInspector } from "@/features/pipelines/components/flow_inspector";
 import { FlowRunPanel } from "@/features/pipelines/components/flow_run_panel";
+import { CanvasViewbar } from "@/features/pipelines/components/canvas_viewbar";
+import { NewAgentDialog } from "@/features/pipelines/components/new_agent_dialog";
+import { useCanvasLayout } from "@/features/pipelines/lib/use_canvas_layout";
 
 const nodeTypes = { step: StepNodeCard };
 const errorText = (e: unknown, fallback: string) => (e instanceof Error && e.message ? e.message : fallback);
@@ -19,6 +22,7 @@ const errorText = (e: unknown, fallback: string) => (e instanceof Error && e.mes
 const ADD: { type: NodeType; label: string; icon: React.ReactNode }[] = [
   { type: "agent", label: "Agent", icon: <Bot size={15} /> },
   { type: "condition", label: "Condition", icon: <GitFork size={15} /> },
+  { type: "router", label: "Router", icon: <RouteIcon size={15} /> },
   { type: "approval", label: "Approval", icon: <ShieldCheck size={15} /> },
   { type: "notify", label: "Notify", icon: <Bell size={15} /> },
   { type: "end", label: "End", icon: <Flag size={15} /> },
@@ -47,6 +51,9 @@ export const WorkflowEditor = () => {
   const [saving, setSaving] = useState(false);
   const [justSaved, setJustSaved] = useState(false);
   const [starting, setStarting] = useState(false);
+  // "New agent" dialog for this agent step.
+  const [creatingFor, setCreatingFor] = useState<string | null>(null);
+  const layout = useCanvasLayout("owl.workflow");
 
   const snapshot = (n: string, d: string, flow: Flow) => JSON.stringify({ n, d, flow });
 
@@ -103,6 +110,12 @@ export const WorkflowEditor = () => {
     return { ...n, selected: n.id === selectedId, data: { ...n.data, agent, status: status.get(n.id) } };
   }), [nodes, agentByKey, status, selectedId]);
 
+  // Edge labels follow the current route names.
+  const shownEdges = useMemo(() => {
+    const byId = new Map(nodes.map((n) => [n.id, n.data.node]));
+    return edges.map((e) => ({ ...e, label: branchLabel(e.sourceHandle, byId.get(e.source)) }));
+  }, [nodes, edges]);
+
   const flow = useMemo(() => toFlow(nodes, edges), [nodes, edges]);
   const dirty = snapshot(name, description, flow) !== saved;
   const selected = nodes.find((n) => n.id === selectedId) ?? null;
@@ -129,8 +142,26 @@ export const WorkflowEditor = () => {
     const node = newNode(type, position, agents.find((a) => a.active));
     setNodes((ns) => [...ns, { id: node.id, type: "step", position, data: { node }, deletable: true }]);
     setSelectedId(node.id);
+    layout.openPanel();
+    // No agent to pick yet: create one right away.
+    if (type === "agent" && !agents.some((a) => a.active)) setCreatingFor(node.id);
   };
-  const updateNode = (node: FlowNode) => setNodes((ns) => ns.map((n) => (n.id === node.id ? { ...n, data: { ...n.data, node } } : n)));
+
+  const attachNewAgent = (agent: StepAgent) => {
+    setAgents((list) => [...list, agent]);
+    setNodes((ns) => ns.map((n) => (n.id === creatingFor && n.data.node.type === "agent"
+      ? { ...n, data: { ...n.data, node: { ...n.data.node, agent_kind: "agent", agent_id: agent.id } } }
+      : n)));
+    setCreatingFor(null);
+  };
+  const updateNode = (node: FlowNode) => {
+    setNodes((ns) => ns.map((n) => (n.id === node.id ? { ...n, data: { ...n.data, node } } : n)));
+    // A deleted route takes its connection with it.
+    if (node.type === "router") {
+      const live = new Set(node.routes.map((r) => `route:${r.id}`));
+      setEdges((es) => es.filter((e) => e.source !== node.id || !e.sourceHandle?.startsWith("route:") || live.has(e.sourceHandle)));
+    }
+  };
   const deleteNode = (id: string) => {
     setNodes((ns) => ns.filter((n) => n.id !== id));
     setEdges((es) => es.filter((e) => e.source !== id && e.target !== id));
@@ -193,7 +224,7 @@ export const WorkflowEditor = () => {
   const blockedReason = isNew ? "Create the workflow first." : dirty ? "Save your changes first." : undefined;
 
   return (
-    <div className="ag_page ag_page--editor wf_page">
+    <div className={`ag_page ag_page--editor wf_page ${layout.focus ? "is_focus" : ""}`}>
       <header className="ag_editor_head">
         <button type="button" className="ag_back" onClick={() => navigate("/pipelines")}><ArrowLeft size={16} /> Workflows</button>
         <div className="ag_editor_head__title">
@@ -209,24 +240,25 @@ export const WorkflowEditor = () => {
         <div className="wf_note"><Info size={14} /> This pipeline now opens as a workflow. Add conditions or approvals; saving converts it (its runs stay).</div>
       )}
 
-      <div className="wf_layout">
+      <div className={`wf_layout ${layout.panel ? "" : "is_panel_closed"}`}>
         <div className="wf_canvas">
+          <CanvasViewbar focus={layout.focus} onFocus={layout.toggleFocus} panel={layout.panel} onPanel={layout.togglePanel} />
           <div className="wf_toolbar" role="toolbar" aria-label="Add a step">
             {ADD.map((a) => (
-              <button key={a.type} type="button" className={`wf_add wf_add--${a.type}`} onClick={() => addStep(a.type)} disabled={a.type === "agent" && !agents.some((x) => x.active)}>
+              <button key={a.type} type="button" className={`wf_add wf_add--${a.type}`} onClick={() => addStep(a.type)}>
                 {a.icon} {a.label}
               </button>
             ))}
           </div>
           <ReactFlow
             nodes={shown}
-            edges={edges}
+            edges={shownEdges}
             nodeTypes={nodeTypes}
             onNodesChange={onNodesChange}
             onEdgesChange={onEdgesChange}
             onConnect={onConnect}
             isValidConnection={isValidConnection}
-            onNodeClick={(_e, n) => setSelectedId(n.id)}
+            onNodeClick={(_e, n) => { setSelectedId(n.id); layout.openPanel(); }}
             onPaneClick={() => setSelectedId(null)}
             deleteKeyCode={["Backspace", "Delete"]}
             fitView
@@ -248,6 +280,7 @@ export const WorkflowEditor = () => {
               onChange={updateNode}
               onDelete={() => deleteNode(selected.id)}
               onClose={() => setSelectedId(null)}
+              onCreateAgent={() => setCreatingFor(selected.id)}
             />
           ) : (
             <FlowRunPanel
@@ -255,6 +288,13 @@ export const WorkflowEditor = () => {
               blockedReason={blockedReason}
               starting={starting}
               onRun={(input) => void run(input)}
+              save={blockedReason ? {
+                label: isNew ? "Create workflow" : "Save changes",
+                onSave: () => void save(),
+                busy: saving,
+                disabled: !name.trim(),
+                hint: !name.trim() ? "Give the workflow a name, then save it." : undefined,
+              } : undefined}
               active={active}
               runs={runs}
               onPick={setActive}
@@ -277,6 +317,8 @@ export const WorkflowEditor = () => {
           )}
         </aside>
       </div>
+
+      {creatingFor && <NewAgentDialog onClose={() => setCreatingFor(null)} onCreated={attachNewAgent} />}
 
       <div className={`ag_savebar ${dirty || isNew ? "is_visible" : ""}`}>
         <ErrorNote message={error} />

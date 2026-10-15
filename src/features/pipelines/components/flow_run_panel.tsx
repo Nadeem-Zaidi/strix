@@ -3,7 +3,7 @@ import { Check, CheckCircle2, ChevronDown, Copy, LoaderCircle, MinusCircle, Paus
 import { Button } from "@/shared/ui/ui";
 import { AgentAvatar } from "@/shared/ui/agent_avatar";
 import type { FlowTraceEntry, PipelineRun } from "@/features/pipelines/api/pipelines_api";
-import { BRANCH_LABEL } from "@/features/pipelines/lib/flow_graph";
+import { branchClass, branchLabel } from "@/features/pipelines/lib/flow_graph";
 
 const STATUS_TEXT: Record<PipelineRun["status"], string> = {
   running: "Running", waiting: "Waiting for approval", succeeded: "Succeeded", failed: "Failed", rejected: "Rejected", cancelled: "Cancelled",
@@ -26,6 +26,8 @@ type Props = {
   blockedReason?: string;
   starting: boolean;
   onRun: (input: string) => void;
+  // When saving is what blocks the run: a save button right here.
+  save?: { label: string; onSave: () => void; busy: boolean; disabled?: boolean; hint?: string };
   active: PipelineRun | null;
   runs: PipelineRun[];
   onPick: (run: PipelineRun) => void;
@@ -34,7 +36,7 @@ type Props = {
 };
 
 // Workflow editor → right panel when no step is selected.
-export const FlowRunPanel = ({ canRun, blockedReason, starting, onRun, active, runs, onPick, onDecide, onCancel }: Props) => {
+export const FlowRunPanel = ({ canRun, blockedReason, starting, onRun, save, active, runs, onPick, onDecide, onCancel }: Props) => {
   const [input, setInput] = useState("");
   const [open, setOpen] = useState<number | null>(null);
   const [comment, setComment] = useState("");
@@ -62,7 +64,13 @@ export const FlowRunPanel = ({ canRun, blockedReason, starting, onRun, active, r
         <Button variant="primary" onClick={() => onRun(input)} busy={starting} disabled={!canRun} title={blockedReason}>
           <Play size={15} /> Run workflow
         </Button>
-        {blockedReason && <span className="ag_muted ag_small">{blockedReason}</span>}
+        {blockedReason && !save && <span className="ag_muted ag_small">{blockedReason}</span>}
+        {blockedReason && save && (
+          <div className="wf_runsave">
+            <span className="ag_muted ag_small">{save.hint ?? blockedReason}</span>
+            <Button onClick={save.onSave} busy={save.busy} disabled={save.disabled}>{save.label}</Button>
+          </div>
+        )}
       </section>
 
       {active && (
@@ -91,7 +99,7 @@ export const FlowRunPanel = ({ canRun, blockedReason, starting, onRun, active, r
                 <button type="button" className="pl_tl__head" onClick={() => setOpen(open === i ? null : i)} disabled={!s.output && !s.error}>
                   <Icon status={s.status} />
                   <span className="pl_tl__agent">{s.agent_icon && <AgentAvatar icon={s.agent_icon} />} {s.label}</span>
-                  {s.branch && <span className={`wf_branch wf_branch--${s.branch}`}>{BRANCH_LABEL[s.branch]}</span>}
+                  {s.branch && <span className={`wf_branch wf_branch--${branchClass(s.branch)}`}>{s.branch_label ?? branchLabel(s.branch)}</span>}
                   {(s.output || s.error) && <ChevronDown size={14} className={open === i ? "ag_rot" : ""} />}
                 </button>
                 {open === i && (

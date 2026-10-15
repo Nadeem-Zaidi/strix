@@ -9,6 +9,9 @@ import { AgentEditor } from "@/features/agents/components/agent_editor";
 import { PipelinesPage } from "@/features/pipelines/components/pipelines_page";
 import { PipelineEditor } from "@/features/pipelines/components/pipeline_editor";
 import { WorkflowEditor } from "@/features/pipelines/components/workflow_editor";
+import { StudioPage } from "@/features/studio/components/studio_page";
+import { StudioEditor } from "@/features/studio/components/studio_editor";
+import { AutomationsPage } from "@/features/automations/components/automations_page";
 import { NativeAgentsPage } from "@/features/native_agents/components/native_agents_page";
 import { SearchPage } from "@/features/insights/components/search_page";
 import { UsagePage } from "@/features/insights/components/usage_page";
@@ -46,6 +49,10 @@ function App() {
           <Route path="/pipelines/new-workflow" element={<WorkflowEditor />} />
           <Route path="/pipelines/:id" element={<PipelineEditor />} />
           <Route path="/pipelines/:id/flow" element={<WorkflowEditor />} />
+          <Route path="/reminders" element={<AutomationsPage />} />
+          <Route path="/studio" element={<StudioPage />} />
+          <Route path="/studio/new" element={<StudioEditor />} />
+          <Route path="/studio/:id" element={<StudioEditor />} />
           <Route path="/native-agents" element={<NativeAgentsPage />} />
           <Route path="/search" element={<SearchPage />} />
           <Route path="/usage" element={<UsagePage />} />

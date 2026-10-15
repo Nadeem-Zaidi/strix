@@ -1,5 +1,5 @@
 import type { Edge, Node } from "@xyflow/react";
-import type { Branch, Flow, FlowNode, FlowTraceEntry, NodeType } from "@/features/pipelines/api/pipelines_api";
+import type { Branch, Flow, FlowNode, FlowTraceEntry, NodeType, Route } from "@/features/pipelines/api/pipelines_api";
 import type { StepAgent } from "@/features/pipelines/api/pipeline_agents";
 
 // The workflow editor works on React Flow nodes/edges; the server stores a
@@ -11,15 +11,29 @@ export type StepNodeData = { node: FlowNode; status?: RunStatus; agent?: StepAge
 export type StepNode = Node<StepNodeData>;
 
 export const TYPE_LABEL: Record<NodeType, string> = {
-  start: "Start", agent: "Agent", condition: "Condition", approval: "Approval", notify: "Notify", end: "End",
+  start: "Start", agent: "Agent", condition: "Condition", router: "Router", approval: "Approval", notify: "Notify", end: "End",
 };
 
-export const BRANCH_LABEL: Record<Branch, string> = { true: "Yes", false: "No", approved: "Approved", rejected: "Rejected" };
+const FIXED_BRANCH: Record<string, string> = { true: "Yes", false: "No", approved: "Approved", rejected: "Rejected", default: "Otherwise" };
+
+// The name shown for an output: fixed ones, or a router route's current name.
+export function branchLabel(branch: string | null | undefined, node?: FlowNode): string | undefined {
+  if (!branch) return undefined;
+  if (branch.startsWith("route:")) {
+    const route = node?.type === "router" ? node.routes.find((r) => `route:${r.id}` === branch) : undefined;
+    return route?.label || "Route";
+  }
+  return FIXED_BRANCH[branch];
+}
+
+// CSS modifier for an output's colour (routes share one).
+export const branchClass = (branch: string) => (branch.startsWith("route:") ? "route" : branch);
 
 export const RULE_LABEL: Record<string, string> = {
-  contains: "contains", not_contains: "doesn't contain", equals: "equals", matches: "matches pattern",
-  number_gt: "number >", number_gte: "number ≥", number_lt: "number <", number_lte: "number ≤",
-  is_empty: "is empty", not_empty: "isn't empty",
+  contains: "contains", not_contains: "doesn't contain", equals: "equals", starts_with: "starts with", ends_with: "ends with",
+  one_of: "is one of", matches: "matches pattern",
+  number_gt: "number >", number_gte: "number ≥", number_lt: "number <", number_lte: "number ≤", number_between: "number between",
+  is_empty: "is empty", not_empty: "isn't empty", exists: "field exists", not_exists: "field is missing",
 };
 
 export const nodeLabel = (n: FlowNode) => n.label || TYPE_LABEL[n.type];
@@ -27,7 +41,7 @@ export const nodeLabel = (n: FlowNode) => n.label || TYPE_LABEL[n.type];
 export function toGraph(flow: Flow): { nodes: StepNode[]; edges: Edge[] } {
   return {
     nodes: flow.nodes.map((n) => ({ id: n.id, type: "step", position: n.position, data: { node: n }, deletable: n.type !== "start" })),
-    edges: flow.edges.map(toEdge),
+    edges: flow.edges.map((e) => toEdge(e)),
   };
 }
 
@@ -37,8 +51,7 @@ export function toEdge(e: { id: string; from: string; to: string; branch?: Branc
     source: e.from,
     target: e.to,
     sourceHandle: e.branch ?? null,
-    label: e.branch ? BRANCH_LABEL[e.branch] : undefined,
-    className: e.branch ? `wf_edge wf_edge--${e.branch}` : "wf_edge",
+    className: e.branch ? `wf_edge wf_edge--${branchClass(e.branch)}` : "wf_edge",
   };
 }
 
@@ -52,6 +65,13 @@ export function toFlow(nodes: StepNode[], edges: Edge[]): Flow {
 
 const newId = (type: NodeType) => `${type}_${Math.random().toString(36).slice(2, 7)}`;
 
+export const newRoute = (n: number, mode: "rule" | "ai"): Route => ({
+  id: `r_${Math.random().toString(36).slice(2, 8)}`,
+  label: `Route ${n}`,
+  when: { match: "all", rules: mode === "rule" ? [{ op: "contains", value: "" }] : [] },
+  ...(mode === "ai" ? { description: "" } : {}),
+});
+
 export function newNode(type: NodeType, position: { x: number; y: number }, agent?: StepAgent): FlowNode {
   const id = newId(type);
   switch (type) {
@@ -59,6 +79,8 @@ export function newNode(type: NodeType, position: { x: number; y: number }, agen
       return { id, type, position, agent_kind: agent?.kind ?? "agent", agent_id: agent?.id ?? "", instruction: "{{previous}}" };
     case "condition":
       return { id, type, position, mode: "rule", source: "previous", op: "contains", value: "" };
+    case "router":
+      return { id, type, position, mode: "rule", source: "previous", routes: [newRoute(1, "rule"), newRoute(2, "rule")] };
     case "approval":
       return { id, type, position, message: "Approve to continue?\n\n{{previous}}", notify: true };
     case "notify":
