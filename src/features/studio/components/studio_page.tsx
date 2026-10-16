@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowRight, Clock, MessageSquare, MoreHorizontal, Pencil, Play, Plus, Trash2, Webhook, Workflow } from "lucide-react";
+import { ArrowRight, Clock, Download, MessageSquare, MoreHorizontal, Pencil, Play, Plus, Trash2, Upload, Webhook, Workflow } from "lucide-react";
 import { AgentAvatar } from "@/shared/ui/agent_avatar";
 import { Button, ConfirmDialog } from "@/shared/ui/ui";
 import { studioApi, type StudioSummary, type TriggerType } from "@/features/studio/api/studio_api";
 import { TEMPLATES } from "@/features/studio/lib/studio_templates";
+import { downloadJson, portableApi } from "@/features/portable/api/portable_api";
+import { ImportDialog } from "@/features/portable/components/import_dialog";
 
 const TRIGGER_ICON: Record<TriggerType, React.ReactNode> = {
   manual: <Play size={12} />, schedule: <Clock size={12} />, webhook: <Webhook size={12} />, chat: <MessageSquare size={12} />,
@@ -21,6 +23,17 @@ export const StudioPage = () => {
   const [deleting, setDeleting] = useState<StudioSummary | null>(null);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const [importing, setImporting] = useState(false);
+
+  const exportProject = async (p: StudioSummary) => {
+    setMenuFor(null);
+    try {
+      downloadJson(await portableApi.exportProject(p.id), p.name);
+      setNotice(`Exported “${p.name}” with its agents. Tokens and secret values aren't in the file — you add them when importing.`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Couldn't export");
+    }
+  };
 
   useEffect(() => {
     studioApi.list().then(setProjects).catch((e) => setError(e instanceof Error ? e.message : "Couldn't load your projects"));
@@ -55,7 +68,10 @@ export const StudioPage = () => {
           <h1 className="ag_page__title">Agent Studio</h1>
           <p className="ag_page__subtitle">Build agents visually: plug a model, tools, knowledge and skills into each one, chain them with routers and approvals, and start it all by hand, on a schedule, from a webhook or a chat command.</p>
         </div>
-        <Button variant="primary" onClick={() => navigate("/studio/new")}><Plus size={16} /> New project</Button>
+        <div className="pt_head_actions">
+          <Button onClick={() => setImporting(true)}><Upload size={16} /> Import</Button>
+          <Button variant="primary" onClick={() => navigate("/studio/new")}><Plus size={16} /> New project</Button>
+        </div>
       </header>
 
       {error && <div className="ag_error">{error}</div>}
@@ -110,6 +126,7 @@ export const StudioPage = () => {
                     {menuFor === p.id && (
                       <div className="ag_menu" role="menu">
                         <button type="button" role="menuitem" onClick={() => navigate(`/studio/${p.id}`)}><Pencil size={14} /> Edit</button>
+                        <button type="button" role="menuitem" onClick={() => void exportProject(p)}><Download size={14} /> Export JSON</button>
                         <button type="button" role="menuitem" className="is_danger" onClick={() => setDeleting(p)}><Trash2 size={14} /> Delete</button>
                       </div>
                     )}
@@ -143,6 +160,14 @@ export const StudioPage = () => {
           onConfirm={confirmDelete}
           onCancel={() => setDeleting(null)}
         />
+      )}
+      {importing && (
+        <ImportDialog onClose={() => setImporting(false)} onDone={(r) => {
+          setImporting(false);
+          if (r.projects.length === 1) return navigate(`/studio/${r.projects[0].id}`);
+          setNotice(`Imported ${r.projects.length} project(s) and ${r.agents.filter((x) => x.created).length} new agent(s).${r.warnings.length ? ` Note: ${r.warnings.join(" ")}` : ""}`);
+          studioApi.list().then(setProjects).catch(() => {});
+        }} />
       )}
     </div>
   );

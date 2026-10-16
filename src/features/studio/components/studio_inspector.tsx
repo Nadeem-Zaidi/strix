@@ -1,14 +1,15 @@
 import { useMemo, useRef, useState } from "react";
-import { BookOpen, Brain, Copy, ExternalLink, Library, RefreshCw, Search, Trash2, Wrench, X } from "lucide-react";
+import { BookOpen, Brain, Copy, ExternalLink, FlaskConical, Library, Play, Plug, RefreshCw, Search, Trash2, Wrench, X } from "lucide-react";
 import { Button, Field, Toggle } from "@/shared/ui/ui";
 import type { KnowledgeDocument } from "@/shared/types";
-import type { AgentCatalog } from "@/features/agents/types";
+import type { AgentCatalog, AgentSummary } from "@/features/agents/types";
 import type { SkillSummary } from "@/features/skills/api/skills_api";
 import type { FlowNode, FlowTraceEntry } from "@/features/pipelines/api/pipelines_api";
 import type { StepNode } from "@/features/pipelines/lib/flow_graph";
 import { FlowInspector } from "@/features/pipelines/components/flow_inspector";
-import { webhookUrl, type Frequency, type Port, type StudioNode, type StudioProject, type TriggerConfig } from "@/features/studio/api/studio_api";
-import { defaultTimezone, nodeName, PORT_LABEL, PORTS, TYPE_LABEL, type CanvasNode } from "@/features/studio/lib/studio_graph";
+import { studioApi, webhookUrl, type Frequency, type Port, type StudioNode, type StudioProject, type TriggerConfig } from "@/features/studio/api/studio_api";
+import { defaultTimezone, nodeName, PORT_LABEL, PORTS, TYPE_LABEL, type AgentExtras, type CanvasNode } from "@/features/studio/lib/studio_graph";
+import { MarkdownOutput } from "@/features/chat/components/markdown_output";
 
 export type InspectorContext = {
   catalog: AgentCatalog | null;
@@ -20,6 +21,10 @@ export type InspectorContext = {
   setDeliver: (v: boolean) => void;
   onRotateWebhook: () => void;
   rotating: boolean;
+  agents: AgentSummary[];               // the user's existing agents
+  usedAgentIds: Set<string>;            // already on the canvas
+  onUseAgent: (agent: AgentSummary | null) => void;
+  extras?: AgentExtras;                 // its MCP servers / functions
 };
 
 type Props = {
@@ -28,6 +33,9 @@ type Props = {
   subs: StudioNode[];                   // what's plugged into this agent
   hostAgent: StudioNode | null;         // the agent a sub-node is plugged into
   runEntry?: FlowTraceEntry;            // this node in the run shown on the canvas
+  sample?: string;                      // what reached this step in that run (for Test this step)
+  onTested?: (output: string) => void;  // a test's answer (feeds the next step's sample)
+  repeatOf?: string | null;             // a repeated agent: the node holding its shared parts
   ctx: InspectorContext;
   onChange: (node: StudioNode) => void;
   onDelete: () => void;
@@ -70,7 +78,13 @@ const LastRun = ({ entry }: { entry?: FlowTraceEntry }) => {
     <div className="as_lastrun">
       <span className="ag_muted ag_small">Last run · {entry.status}{entry.branch_label ? ` → ${entry.branch_label}` : ""}</span>
       {entry.error && <div className="ag_error">{entry.error}</div>}
-      {entry.output && <pre className="ag_run__output">{entry.output}</pre>}
+      {entry.prompt && (
+        <details>
+          <summary className="ag_small">What it was asked</summary>
+          <pre className="ag_run__output">{entry.prompt}</pre>
+        </details>
+      )}
+      {entry.output && <MarkdownOutput text={entry.output} />}
     </div>
   );
 };
@@ -209,12 +223,47 @@ const TriggerEditor = ({ node, onChange, ctx }: Props & { node: Extract<StudioNo
 };
 
 // ── agent ──
-const AgentEditorPanel = ({ node, onChange, before, subs, onSelect, onAddSub, runEntry, ctx }: Props & { node: Extract<StudioNode, { type: "agent" }> }) => {
+const AgentEditorPanel = ({ node, onChange, before, subs, onSelect, onAddSub, runEntry, ctx, sample, repeatOf, onTested }: Props & { node: Extract<StudioNode, { type: "agent" }> }) => {
   const setAgent = (patch: Partial<typeof node.agent>) => onChange({ ...node, agent: { ...node.agent, ...patch } });
   const subText = (s: StudioNode) => s.type === "model" ? `${s.model || "Default model"}` : s.type === "tool" ? (ctx.catalog?.builtinTools.find((t) => t.id === s.tool)?.label ?? s.tool)
     : s.type === "knowledge" ? `${s.document_keys.length} document${s.document_keys.length === 1 ? "" : "s"}` : s.type === "skill" ? (s.skill_id === "*" ? "All skills" : ctx.skills.find((k) => k.id === s.skill_id)?.name ?? "Skill") : "";
+  const linked = node.agent_id ? ctx.agents.find((a) => a.id === node.agent_id) : undefined;
+  const choices = ctx.agents;
+  const extras = linked ? [
+    linked.mcp_count && `${linked.mcp_count} MCP server${linked.mcp_count === 1 ? "" : "s"}`,
+    linked.function_count && `${linked.function_count} HTTP function${linked.function_count === 1 ? "" : "s"}`,
+    linked.code_function_count && `${linked.code_function_count} code function${linked.code_function_count === 1 ? "" : "s"}`,
+  ].filter(Boolean) : [];
   return (
     <>
+      <Field label="Agent" hint={node.agent_id
+        ? "Changes here update this agent everywhere it's used (chat, WhatsApp, other projects)."
+        : "Pick one of your agents, or build a new one below — it's created when you save."}>
+        <select className="ag_input" value={node.agent_id ?? ""}
+          onChange={(e) => ctx.onUseAgent(e.target.value ? ctx.agents.find((a) => a.id === e.target.value) ?? null : null)}>
+          <option value="">{node.agent_id ? "＋ Make a new copy instead" : "＋ New agent (created on save)"}</option>
+          {choices.length > 0 && (
+            <optgroup label="Your agents">
+              {choices.map((a) => <option key={a.id} value={a.id}>{a.icon} {a.name}{a.id !== node.agent_id && ctx.usedAgentIds.has(a.id) ? " (already in this project)" : ""}</option>)}
+            </optgroup>
+          )}
+        </select>
+      </Field>
+      {ctx.extras && ctx.extras.mcp.length > 0 && (
+        <div className="as_plugged">
+          <span className="ag_small"><strong>MCP servers</strong> <span className="ag_muted">(work in this project)</span></span>
+          {ctx.extras.mcp.map((m) => (
+            <span key={m.name} className="as_plugged__item as_plugged__item--static"><Plug size={14} /> <span>{m.name} — {m.on} of {m.total} tools on</span></span>
+          ))}
+          <a className="as_link" href={`/agents/${node.agent_id}?tab=tools`} target="_blank" rel="noreferrer"><ExternalLink size={13} /> Manage MCP servers and tools</a>
+        </div>
+      )}
+      {repeatOf && <p className="as_repeat_note ag_small">This agent appears earlier in the project too. Its settings and plugged-in parts are shared; the <strong>task</strong> below is this step's own.</p>}
+      {(() => {
+        // MCP servers are listed above once loaded; mention the rest here.
+        const rest = ctx.extras?.mcp.length ? extras.filter((x) => !String(x).includes("MCP")) : extras;
+        return rest.length > 0 ? <p className="ag_muted ag_small">Also keeps its {rest.join(", ")} — edit those on the Agents page.</p> : null;
+      })()}
       <div className="as_agent_row">
         <Field label="Icon"><input className="ag_input as_icon_input" value={node.agent.icon} maxLength={8} onChange={(e) => setAgent({ icon: e.target.value })} /></Field>
         <Field label="Agent name"><input className="ag_input" value={node.agent.name} maxLength={60} placeholder="e.g. Researcher" onChange={(e) => setAgent({ name: e.target.value })} /></Field>
@@ -244,8 +293,68 @@ const AgentEditorPanel = ({ node, onChange, before, subs, onSelect, onAddSub, ru
       {node.agent_id
         ? <a className="as_link" href={`/agents/${node.agent_id}`} target="_blank" rel="noreferrer"><ExternalLink size={13} /> HTTP functions, MCP servers and instruction files — open on the Agents page</a>
         : <p className="ag_muted ag_small">Saving creates this as a real agent: it also appears on the Agents page and can be used in chat.</p>}
+      <TestStep node={node} subs={subs} sample={sample ?? ""} usesInput={/\{\{\s*(input|previous)\s*\}\}/.test(node.instruction) || !/\{\{/.test(node.instruction)} onTested={onTested} />
       <LastRun entry={runEntry} />
     </>
+  );
+};
+
+// "Test this step": one run of this agent with a sample input, as it's set
+// up on the canvas now (unsaved changes included) — nothing is saved.
+const TestStep = ({ node, subs, sample, usesInput, onTested }: {
+  node: Extract<StudioNode, { type: "agent" }>; subs: StudioNode[]; sample: string; usesInput: boolean; onTested?: (output: string) => void;
+}) => {
+  const [open, setOpen] = useState(false);
+  const [input, setInput] = useState(sample);
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<{ output: string; error: string | null; prompt: string; duration_ms: number } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const run = async () => {
+    setBusy(true);
+    setError(null);
+    setResult(null);
+    try {
+      const r = await studioApi.testStep({ node, subs, input });
+      setResult(r);
+      if (r.output && !r.error) onTested?.(r.output);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "The test didn't run");
+    } finally {
+      setBusy(false);
+    }
+  };
+  if (!open) {
+    return <button type="button" className="as_test_open" onClick={() => { setInput(sample); setOpen(true); }}><FlaskConical size={14} /> Test this step</button>;
+  }
+  return (
+    <div className="as_test">
+      <div className="as_test__head">
+        <strong className="ag_small"><FlaskConical size={13} /> Test this step</strong>
+        <button type="button" className="ag_icon_btn" aria-label="Close test" onClick={() => setOpen(false)}><X size={14} /></button>
+      </div>
+      <Field label="Sample input" hint="Stands in for {{previous}} and {{input}}. Runs this agent once as set up here — unsaved changes included; nothing is saved. Uses your model credits.">
+        <textarea className="ag_input" rows={3} value={input} maxLength={50000} onChange={(e) => setInput(e.target.value)} placeholder="e.g. KAN-4: add am_craft attribute…" />
+      </Field>
+      {usesInput && !input.trim() && (
+        <p className="as_test__empty ag_small">
+          This step's task uses the previous step's output, but there's nothing here yet. A test runs <strong>only this agent</strong> — the steps before it don't run.
+          Type a sample, <strong>test the previous agent first</strong> (its answer fills in here), or run the whole project to pass real data through.
+        </p>
+      )}
+      <Button variant="primary" onClick={() => void run()} busy={busy} disabled={usesInput && !input.trim()}><Play size={14} /> Run test</Button>
+      {error && <div className="ag_error">{error}</div>}
+      {result && (
+        <div className="as_test__result">
+          <span className="ag_muted ag_small">{result.error ? "Failed" : "Done"} in {(result.duration_ms / 1000).toFixed(1)}s</span>
+          {result.error && <div className="ag_error">{result.error}</div>}
+          {result.output && <MarkdownOutput text={result.output} />}
+          <details>
+            <summary className="ag_small">What the agent was asked</summary>
+            <pre className="ag_run__output">{result.prompt}</pre>
+          </details>
+        </div>
+      )}
+    </div>
   );
 };
 

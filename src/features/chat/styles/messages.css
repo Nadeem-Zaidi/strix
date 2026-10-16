@@ -962,3 +962,44 @@
         max-width: 150px;
     }
 }
+
+/* Agent answers rendered as Markdown in panels and run views (MarkdownOutput). */
+.md_output {
+    max-height: 340px;
+    overflow: auto;
+    padding: 8px 12px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--bg-subtle, var(--bg-surface));
+}
+
+.md_output--tall { max-height: 62vh; }
+
+.md_output .message.bot_message {
+    font-size: 13.5px;
+    line-height: 1.6;
+    margin: 0;
+}
+
+.md_output .bot_message h1 { font-size: 16px; margin: 14px 0 6px; }
+.md_output .bot_message h2 { font-size: 15px; margin: 12px 0 6px; }
+.md_output .bot_message h3,
+.md_output .bot_message h4 { font-size: 14px; margin: 10px 0 4px; }
+.md_output .bot_message > :first-child { margin-top: 0; }
+.md_output .bot_message ul,
+.md_output .bot_message ol { padding-left: 18px; margin: 4px 0 8px; }
+.md_output .bot_message p { margin-bottom: 8px; }
+.md_output .code_block_wrapper { margin: 8px 0; }
+.md_output .table_wrapper { margin: 8px 0; }
+
+/* An agent asking another agent (ask_… tool) */
+.helper-card .mcp-badge { background: color-mix(in srgb, var(--accent) 12%, transparent); color: var(--accent); }
+
+.helper-card__label {
+    margin: 8px 0 4px;
+    font-size: 11.5px;
+    font-weight: 600;
+    color: var(--text-sec);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}

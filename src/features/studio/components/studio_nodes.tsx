@@ -1,7 +1,7 @@
 import { memo, useEffect } from "react";
 import { Handle, Position, useUpdateNodeInternals, type NodeProps } from "@xyflow/react";
 import {
-  Bell, BookOpen, Brain, CheckCircle2, CirclePlay, Clock, Flag, GitFork, Library, LoaderCircle, MessageSquare, PauseCircle, Plus,
+  Bell, Bot, BookOpen, Brain, CheckCircle2, CirclePlay, Clock, Code2, Flag, GitFork, Globe, Library, LoaderCircle, MessageSquare, PauseCircle, Plug, Plus,
   Route as RouteIcon, ShieldCheck, Webhook, Wrench, XCircle,
 } from "lucide-react";
 import { AgentAvatar } from "@/shared/ui/agent_avatar";
@@ -55,10 +55,22 @@ export const AgentNode = memo(({ data, selected }: NodeProps<CanvasNode>) => {
         <span className="as_agent__avatar"><AgentAvatar icon={n.agent.icon || "🤖"} /></span>
         <div className="as_node__text">
           <strong>{nodeName(n)}</strong>
-          <span>{n.agent_id ? "AI agent" : "New agent — created on save"}</span>
+          <span>{data.shared ? "Same agent again · settings shared" : n.agent_id ? "AI agent" : "New agent — created on save"}</span>
         </div>
         <StatusBadge status={data.status} />
       </div>
+      {data.extras && (data.extras.mcp.length > 0 || data.extras.functions > 0 || data.extras.codeFunctions > 0 || (data.extras.helpers ?? []).length > 0) && (
+        <div className="as_agent__extras">
+          {data.extras.mcp.map((m) => (
+            <span key={m.name} className="as_extra as_extra--mcp" title={`MCP server: ${m.on} of ${m.total} tools on`}><Plug size={11} /> {m.name} · {m.on} tools</span>
+          ))}
+          {data.extras.functions > 0 && <span className="as_extra" title="HTTP functions"><Globe size={11} /> {data.extras.functions} function{data.extras.functions === 1 ? "" : "s"}</span>}
+          {data.extras.codeFunctions > 0 && <span className="as_extra" title="Python code functions"><Code2 size={11} /> {data.extras.codeFunctions} code</span>}
+          {(data.extras.helpers ?? []).length > 0 && (
+            <span className="as_extra as_extra--helper" title={`Can ask: ${data.extras.helpers!.join(", ")}`}><Bot size={11} /> asks {data.extras.helpers!.join(", ")}</span>
+          )}
+        </div>
+      )}
       <div className="as_agent__ports">
         {PORTS.map((p) => {
           const c = p === "model" ? (model ? 1 : 0) : count(p === "tools" ? "tool" : p === "skills" ? "skill" : "knowledge");

@@ -35,6 +35,7 @@ export type FlowTraceEntry = {
   kind?: "agent" | "native";
   agent_name?: string;
   agent_icon?: string;
+  prompt?: string;       // agent steps: what the agent was asked (first 2000 characters)
   output?: string;
   error?: string;
   branch?: Branch;

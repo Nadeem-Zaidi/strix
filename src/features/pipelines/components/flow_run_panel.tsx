@@ -4,6 +4,7 @@ import { Button } from "@/shared/ui/ui";
 import { AgentAvatar } from "@/shared/ui/agent_avatar";
 import type { FlowTraceEntry, PipelineRun } from "@/features/pipelines/api/pipelines_api";
 import { branchClass, branchLabel } from "@/features/pipelines/lib/flow_graph";
+import { MarkdownOutput } from "@/features/chat/components/markdown_output";
 
 const STATUS_TEXT: Record<PipelineRun["status"], string> = {
   running: "Running", waiting: "Waiting for approval", succeeded: "Succeeded", failed: "Failed", rejected: "Rejected", cancelled: "Cancelled",
@@ -106,7 +107,7 @@ export const FlowRunPanel = ({ canRun, blockedReason, starting, onRun, save, act
                   <div className="pl_tl__body">
                     {s.error && <div className="ag_error">{s.error}</div>}
                     {s.decided_by && <p className="ag_muted ag_small">{s.status === "rejected" ? "Rejected" : "Approved"} by {s.decided_by}{s.comment ? ` — “${s.comment}”` : ""}</p>}
-                    {s.output && <pre className="ag_run__output">{s.output}</pre>}
+                    {s.output && <MarkdownOutput text={s.output} />}
                   </div>
                 )}
               </li>
@@ -123,7 +124,7 @@ export const FlowRunPanel = ({ canRun, blockedReason, starting, onRun, save, act
                   {copied ? <><Check size={14} /> Copied</> : <><Copy size={14} /> Copy</>}
                 </Button>
               </div>
-              <pre className="ag_run__output pl_final__text">{active.output}</pre>
+              <MarkdownOutput text={active.output} className="pl_final__text" />
             </div>
           )}
         </section>

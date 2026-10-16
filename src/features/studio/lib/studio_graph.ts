@@ -7,7 +7,9 @@ import type { Port, StudioCanvas, StudioEdge, StudioNode, StudioNodeType, SubTyp
 // knowledge, skills) on ports along their bottom edge, like n8n.
 
 export type RunStatus = FlowTraceEntry["status"];
-export type CanvasData = { node: StudioNode; status?: RunStatus; subs?: StudioNode[]; onAdd?: (port: Port) => void; labels?: Record<string, string> };
+// Set up on the Agents page and kept as they are: MCP servers, HTTP and code functions.
+export type AgentExtras = { mcp: { name: string; on: number; total: number }[]; functions: number; codeFunctions: number; helpers?: string[] };
+export type CanvasData = { node: StudioNode; status?: RunStatus; subs?: StudioNode[]; onAdd?: (port: Port) => void; labels?: Record<string, string>; extras?: AgentExtras; shared?: boolean };
 export type CanvasNode = Node<CanvasData>;
 
 export const SUB_PORT: Record<SubType, Port> = { model: "model", tool: "tools", knowledge: "knowledge", skill: "skills" };
@@ -95,6 +97,27 @@ export function subsOf(agentId: string, nodes: StudioNode[], edges: Edge[]): Stu
   return nodes.filter((n) => ids.has(n.id));
 }
 
+// The sub-nodes that mirror an existing agent's settings (model, tools,
+// knowledge, skills), placed under its node and plugged in. Saving the
+// project writes these back, so they must match what the agent has.
+export function subsFromAgent(
+  a: { provider: string | null; model: string | null; builtin_tools: string[]; document_keys: string[]; skill_mode?: "all" | "selected" | "none"; skill_ids?: string[] },
+  at: { x: number; y: number },
+  agentNodeId: string,
+): { nodes: StudioNode[]; edges: StudioEdge[] } {
+  const subs: StudioNode[] = [];
+  const pos = () => ({ x: at.x - 30 + subs.length * 88, y: at.y + 190 });
+  if (a.provider) subs.push({ id: newId("model"), type: "model", position: pos(), provider: a.provider, model: a.model ?? null });
+  for (const t of a.builtin_tools ?? []) subs.push({ id: newId("tool"), type: "tool", position: pos(), tool: t });
+  if ((a.document_keys ?? []).length) subs.push({ id: newId("knowledge"), type: "knowledge", position: pos(), document_keys: [...a.document_keys] });
+  if (a.skill_mode === "all" || a.skill_mode === undefined) subs.push({ id: newId("skill"), type: "skill", position: pos(), skill_id: "*" });
+  else if (a.skill_mode === "selected") for (const s of a.skill_ids ?? []) subs.push({ id: newId("skill"), type: "skill", position: pos(), skill_id: s });
+  return {
+    nodes: subs,
+    edges: subs.map((s) => ({ id: `${s.id}-${agentNodeId}`, from: s.id, to: agentNodeId, port: SUB_PORT[s.type as SubType] })),
+  };
+}
+
 // Agents and steps that run before `id` (main edges only).
 export function upstream(id: string, nodes: CanvasNode[], edges: Edge[]): CanvasNode[] {
   const before = new Set<string>();
@@ -104,6 +127,43 @@ export function upstream(id: string, nodes: CanvasNode[], edges: Edge[]): Canvas
   };
   walk(id);
   return nodes.filter((n) => before.has(n.id));
+}
+
+// An agent can appear several times; its parts (model, tools, …) live on one
+// "primary" node — the occurrence with the most sub-nodes, the first on ties
+// (the server picks the same way). Returns agent id → node id.
+export function primaryNodes(nodes: StudioNode[], edges: Edge[]): Map<string, string> {
+  const subCount = (id: string) => edges.filter((e) => e.target === id && e.targetHandle && e.targetHandle !== "in").length;
+  const best = new Map<string, { id: string; subs: number }>();
+  for (const n of nodes) {
+    if (n.type !== "agent" || !n.agent_id) continue;
+    const subs = subCount(n.id);
+    const cur = best.get(n.agent_id);
+    if (!cur || subs > cur.subs) best.set(n.agent_id, { id: n.id, subs });
+  }
+  return new Map([...best].map(([agentId, b]) => [agentId, b.id]));
+}
+
+// What each node handed to the next step in a run: the trigger and agents
+// pass their output; conditions, routers, approvals and notify pass the
+// previous text through unchanged.
+export function passedOut(trace: FlowTraceEntry[]): Map<string, string> {
+  const out = new Map<string, string>();
+  let previous = "";
+  for (const t of trace) {
+    if ((t.type === "start" || t.type === "agent") && t.status === "succeeded" && typeof t.output === "string") previous = t.output;
+    if (t.status !== "running") out.set(t.node_id, previous);
+  }
+  return out;
+}
+
+// Whether a run went along this connection: both ends ran, in order, and a
+// branching source chose this output.
+export function edgeTaken(e: Edge, order: Map<string, number>, trace: Map<string, FlowTraceEntry>): boolean {
+  const a = order.get(e.source), b = order.get(e.target);
+  if (a === undefined || b === undefined || b <= a) return false;
+  const branch = trace.get(e.source)?.branch;
+  return branch ? e.sourceHandle === branch : !e.sourceHandle;
 }
 
 export function traceByNode(trace: FlowTraceEntry[] | undefined): Map<string, FlowTraceEntry> {

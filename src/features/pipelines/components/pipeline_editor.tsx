@@ -5,6 +5,7 @@ import { loadStepAgents, providerLabel, stepKey, type StepAgent } from "@/featur
 import { pipelinesApi, type PipelineInput, type PipelineRun, type StepRunStatus } from "@/features/pipelines/api/pipelines_api";
 import { AgentAvatar } from "@/shared/ui/agent_avatar";
 import { Button, ErrorNote } from "@/shared/ui/ui";
+import { MarkdownOutput } from "@/features/chat/components/markdown_output";
 
 const EMPTY: PipelineInput = { name: "", description: "", steps: [] };
 
@@ -289,7 +290,7 @@ export const PipelineEditor = () => {
                     {openStep === i && (
                       <div className="pl_tl__body">
                         {s.error && <div className="ag_error">{s.error}</div>}
-                        {s.output && <pre className="ag_run__output">{s.output}</pre>}
+                        {s.output && <MarkdownOutput text={s.output} />}
                       </div>
                     )}
                   </li>
@@ -304,7 +305,7 @@ export const PipelineEditor = () => {
                       {copied ? <><Check size={14} /> Copied</> : <><Copy size={14} /> Copy</>}
                     </Button>
                   </div>
-                  <pre className="ag_run__output pl_final__text">{active.output}</pre>
+                  <MarkdownOutput text={active.output} className="pl_final__text" />
                 </div>
               )}
             </section>

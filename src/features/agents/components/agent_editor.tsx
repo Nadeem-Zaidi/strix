@@ -11,17 +11,20 @@ import type { AgentCatalog, AgentDetail, AgentFunction, AgentInput, AgentRun, Co
 import { CodeFunctionDialog } from "@/features/agents/components/code_function_dialog";
 import { FunctionDialog } from "@/features/agents/components/function_dialog";
 import { McpDialog } from "@/features/agents/components/mcp_dialog";
+import { McpEditDialog } from "@/features/agents/components/mcp_edit_dialog";
 import { ScheduleDialog } from "@/features/agents/components/schedule_dialog";
 import { AgentAvatar } from "@/shared/ui/agent_avatar";
 import { Button, ConfirmDialog, ErrorNote, Toggle } from "@/shared/ui/ui";
 import { InstructionFilesEditor, InstructionsImport, LoadDescriptionButton } from "@/features/agents/components/instruction_files";
 import { AgentSkillsSection } from "@/features/skills/components/agent_skills";
+import { HelperAgentsSection } from "@/features/agents/components/helper_agents_section";
+import { MarkdownOutput } from "@/features/chat/components/markdown_output";
 
 type Tab = "configure" | "tools" | "schedules" | "activity";
 
 const EMOJIS = ["🤖", "🧠", "🦉", "📚", "🧾", "🎓", "💼", "📰", "🛠️", "🔍", "📈", "💡", "✍️", "🧪", "🗂️", "📅", "🌐", "🛡️", "💬", "🎯", "⚙️", "📦", "🧭", "🚀"];
 
-const EMPTY: AgentInput = { name: "", icon: "🤖", description: "", instructions: "", provider: null, model: null, builtin_tools: ["search_knowledge_base"], document_keys: [], starters: [], instruction_files: [], skill_mode: "all", skill_ids: [] };
+const EMPTY: AgentInput = { name: "", icon: "🤖", description: "", instructions: "", provider: null, model: null, builtin_tools: ["search_knowledge_base"], document_keys: [], starters: [], instruction_files: [], skill_mode: "all", skill_ids: [], helper_agent_ids: [] };
 
 const fmtDate = (iso: string | null) => (iso ? new Date(iso).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }) : "—");
 const relative = (iso: string | null) => {
@@ -72,6 +75,7 @@ export const AgentEditor = () => {
           model: d.model, builtin_tools: d.builtin_tools, document_keys: d.document_keys, starters: d.starters,
           instruction_files: d.instruction_files ?? [],
           skill_mode: d.skill_mode ?? "all", skill_ids: d.skill_ids ?? [],
+          helper_agent_ids: d.helper_agent_ids ?? [],
         };
         setForm(input);
         setSaved(input);
@@ -175,6 +179,7 @@ export const AgentEditor = () => {
       {tab === "configure" && catalog && (
         <ConfigureTab
           isNew={isNew}
+          agentId={isNew ? undefined : routeId}
           form={form}
           set={set}
           catalog={catalog}
@@ -204,8 +209,9 @@ export const AgentEditor = () => {
 };
 
 // ── Configure ────────────────────────────────────────────────────────────
-const ConfigureTab = ({ isNew, form, set, catalog, documents, describe, setDescribe, drafting, onGenerate }: {
+const ConfigureTab = ({ isNew, agentId, form, set, catalog, documents, describe, setDescribe, drafting, onGenerate }: {
   isNew: boolean;
+  agentId?: string;
   form: AgentInput;
   set: <K extends keyof AgentInput>(key: K, value: AgentInput[K]) => void;
   catalog: AgentCatalog;
@@ -347,6 +353,8 @@ const ConfigureTab = ({ isNew, form, set, catalog, documents, describe, setDescr
           onChange={(mode, ids) => { set("skill_mode", mode); set("skill_ids", ids); }}
         />
 
+        <HelperAgentsSection agentId={agentId} ids={form.helper_agent_ids ?? []} onChange={(ids) => set("helper_agent_ids", ids)} />
+
         <section className="ag_section">
           <h2 className="ag_section__title">Built-in tools</h2>
           <div className="ag_builtins">
@@ -411,6 +419,8 @@ const ToolsTab = ({ detail, setDetail, catalog }: { detail: AgentDetail; setDeta
   const code = catalog?.codeFunctions;
   const [mcpDialog, setMcpDialog] = useState(false);
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [editingMcp, setEditingMcp] = useState<McpServer | null>(null);
+  const [toolQuery, setToolQuery] = useState("");
   const [confirm, setConfirm] = useState<{ kind: "fn" | "mcp" | "code"; id: string; name: string } | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -437,6 +447,14 @@ const ToolsTab = ({ detail, setDetail, catalog }: { detail: AgentDetail; setDeta
   const toggleMcpTool = (s: McpServer, toolName: string, on: boolean) =>
     run(`mcp:${s.id}`, async () => {
       const enabledTools = s.tools.filter((t) => (t.name === toolName ? on : t.enabled)).map((t) => t.name);
+      replaceMcp(await agentsApi.updateMcp(detail.id, s.id, { enabledTools }));
+    });
+
+  // Switch many tools at once (the ones shown by the filter, or all).
+  const setMcpTools = (s: McpServer, names: string[], on: boolean) =>
+    run(`mcp:${s.id}`, async () => {
+      const target = new Set(names);
+      const enabledTools = s.tools.filter((t) => (target.has(t.name) ? on : t.enabled)).map((t) => t.name);
       replaceMcp(await agentsApi.updateMcp(detail.id, s.id, { enabledTools }));
     });
 
@@ -562,17 +580,34 @@ const ToolsTab = ({ detail, setDetail, catalog }: { detail: AgentDetail; setDeta
                       <span className="ag_item__sub ag_mono">{s.url}</span>
                     </div>
                     {s.hasToken && <span className="ag_chip"><Lock size={12} /> token</span>}
-                    <button type="button" className="ag_chip ag_chip--button" onClick={() => setExpanded(open ? null : s.id)} aria-expanded={open}>
+                    <button type="button" className="ag_chip ag_chip--button" onClick={() => { setExpanded(open ? null : s.id); setToolQuery(""); }} aria-expanded={open}>
                       {on}/{s.tools.length} tools <ChevronDown size={13} className={open ? "ag_rot" : ""} />
                     </button>
                     <button type="button" className="ag_icon_btn" aria-label="Refresh tool list" title="Refresh tool list" disabled={busy === `refresh:${s.id}`} onClick={() => run(`refresh:${s.id}`, async () => replaceMcp(await agentsApi.refreshMcp(detail.id, s.id)))}>
                       <RefreshCw size={15} className={busy === `refresh:${s.id}` ? "spin" : ""} />
                     </button>
+                    <button type="button" className="ag_icon_btn" aria-label={`Edit ${s.name}`} title="Edit name, URL or token" onClick={() => setEditingMcp(s)}>
+                      <Pencil size={15} />
+                    </button>
                     <button type="button" className="ag_icon_btn ag_icon_btn--danger" aria-label={`Remove ${s.name}`} onClick={() => setConfirm({ kind: "mcp", id: s.id, name: s.name })}><Trash2 size={15} /></button>
                   </div>
-                  {open && (
+                  {open && (() => {
+                    const q = toolQuery.trim().toLowerCase();
+                    const shown = q ? s.tools.filter((t) => `${t.name} ${t.description ?? ""}`.toLowerCase().includes(q)) : s.tools;
+                    return (
                     <div className="ag_mcp_tools">
-                      {s.tools.map((t) => (
+                      <div className="ag_mcp_tools__bar">
+                        {s.tools.length > 6 && (
+                          <label className="ag_search"><Search size={14} /><input value={toolQuery} onChange={(e) => setToolQuery(e.target.value)} placeholder="Filter tools" aria-label={`Filter ${s.name} tools`} /></label>
+                        )}
+                        <span className="ag_muted ag_small">{on} of {s.tools.length} on{q ? ` · ${shown.length} shown` : ""}</span>
+                        <div className="ag_mcp_tools__bulk">
+                          <Button variant="ghost" disabled={busy === `mcp:${s.id}` || shown.every((t) => t.enabled)} onClick={() => setMcpTools(s, shown.map((t) => t.name), true)}>{q ? "Turn shown on" : "All on"}</Button>
+                          <Button variant="ghost" disabled={busy === `mcp:${s.id}` || shown.every((t) => !t.enabled)} onClick={() => setMcpTools(s, shown.map((t) => t.name), false)}>{q ? "Turn shown off" : "All off"}</Button>
+                        </div>
+                      </div>
+                      {shown.length === 0 && <span className="ag_muted ag_small">No tools match “{toolQuery}”.</span>}
+                      {shown.map((t) => (
                         <div key={t.name} className="ag_mcp_tool">
                           <div>
                             <strong className="ag_mono">{t.name}</strong>
@@ -582,7 +617,8 @@ const ToolsTab = ({ detail, setDetail, catalog }: { detail: AgentDetail; setDeta
                         </div>
                       ))}
                     </div>
-                  )}
+                    );
+                  })()}
                 </div>
               );
             })}
@@ -595,6 +631,10 @@ const ToolsTab = ({ detail, setDetail, catalog }: { detail: AgentDetail; setDeta
       )}
       {codeDialog.open && (
         <CodeFunctionDialog agentId={detail.id} initial={codeDialog.fn} onClose={() => setCodeDialog({ open: false })} onSaved={(fn) => { replaceCode(fn); setCodeDialog({ open: false }); }} />
+      )}
+      {editingMcp && (
+        <McpEditDialog agentId={detail.id} server={editingMcp} onClose={() => setEditingMcp(null)}
+          onSaved={(s) => { replaceMcp(s); setEditingMcp(null); setExpanded(s.id); }} />
       )}
       {mcpDialog && <McpDialog agentId={detail.id} onClose={() => setMcpDialog(false)} onAdded={(s) => { replaceMcp(s); setMcpDialog(false); setExpanded(s.id); }} />}
       {confirm && (
@@ -767,7 +807,7 @@ const ActivityTab = ({ agentId }: { agentId: string }) => {
                   {open === r.id && (
                     <div className="ag_run__body">
                       {r.error && <div className="ag_error">{r.error}</div>}
-                      {r.output && <pre className="ag_run__output">{r.output}</pre>}
+                      {r.output && <MarkdownOutput text={r.output} />}
                       {r.session_id && <Button variant="ghost" onClick={() => navigate(`/chathome?session=${r.session_id}`)}><ExternalLink size={14} /> Open full chat</Button>}
                     </div>
                   )}

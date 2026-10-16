@@ -40,6 +40,7 @@
 @import "../features/pipelines/styles/pipelines.css";
 @import "../features/studio/styles/studio.css";
 @import "../features/automations/styles/automations.css";
+@import "../features/portable/styles/portable.css";
 @import "../features/native_agents/styles/native_agents.css";
 @import "../features/billing/styles/billing.css";
 @import "../features/insights/styles/insights.css";

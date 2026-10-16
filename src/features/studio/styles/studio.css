@@ -448,3 +448,173 @@
     .as_form2 { grid-template-columns: 1fr; }
     .as_hint { display: none; }
 }
+
+/* "My agents" menu in the canvas toolbar */
+.as_agentmenu { position: relative; }
+
+.as_agentmenu__list {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    z-index: 20;
+    display: grid;
+    gap: 2px;
+    width: 280px;
+    max-height: 320px;
+    overflow: auto;
+    padding: 6px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--bg-surface);
+    box-shadow: var(--shadow-md, var(--shadow-sm));
+}
+
+.as_agentmenu__list > span { padding: 6px 8px; }
+
+.as_agentmenu__list button {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px;
+    border: none;
+    border-radius: 8px;
+    background: none;
+    font: inherit;
+    color: var(--text-pri);
+    text-align: left;
+    cursor: pointer;
+}
+
+.as_agentmenu__list button:hover { background: var(--bg-hover); }
+.as_agentmenu__icon { font-size: 18px; flex: none; }
+.as_agentmenu__text { display: grid; min-width: 0; }
+.as_agentmenu__text strong { font-size: 13px; }
+.as_agentmenu__text span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11.5px; color: var(--text-sec); }
+
+/* What an existing agent brings from the Agents page (MCP servers, functions). */
+.as_agent__extras {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    padding: 0 12px 10px;
+}
+
+.as_extra {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    max-width: 100%;
+    padding: 2px 7px;
+    border-radius: 999px;
+    background: var(--bg-hover, rgba(0, 0, 0, 0.05));
+    color: var(--text-sec);
+    font-size: 10.5px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.as_extra--mcp { background: color-mix(in srgb, #0891b2 12%, transparent); color: #0e7490; }
+.as_plugged__item--static { cursor: default; }
+.as_plugged__item--static:hover { border-color: var(--border); }
+
+/* Run path and passed text on connections */
+.as_edge_path.is_taken { stroke: #16a34a !important; stroke-width: 2.2px !important; }
+.as_edge_path.is_skipped { opacity: 0.35; }
+
+.as_edge_label {
+    position: absolute;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    pointer-events: all;
+}
+
+.as_edge_branch {
+    padding: 1px 6px;
+    border-radius: 6px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    font-size: 10px;
+    color: var(--text-sec);
+}
+
+.as_edge_branch.is_taken { border-color: #16a34a; color: #15803d; }
+
+.as_edge_data {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    max-width: 200px;
+    padding: 2px 8px;
+    border: 1px solid #16a34a;
+    border-radius: 999px;
+    background: color-mix(in srgb, #16a34a 8%, var(--bg-surface));
+    color: #15803d;
+    font: inherit;
+    font-size: 10.5px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    cursor: pointer;
+}
+
+.as_edge_data:hover { background: color-mix(in srgb, #16a34a 16%, var(--bg-surface)); }
+
+.as_passed {
+    max-height: 60vh;
+    margin: 0;
+    overflow: auto;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    font-size: 13px;
+}
+
+/* Test this step */
+.as_test_open {
+    justify-self: start;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    border: 1px dashed var(--accent);
+    border-radius: 8px;
+    background: none;
+    font: inherit;
+    font-size: 13px;
+    color: var(--accent);
+    cursor: pointer;
+}
+
+.as_test {
+    display: grid;
+    gap: 8px;
+    padding: 10px;
+    border: 1px solid var(--accent);
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--accent) 4%, var(--bg-surface));
+}
+
+.as_test__head { display: flex; align-items: center; justify-content: space-between; }
+.as_test__head strong { display: inline-flex; align-items: center; gap: 6px; }
+.as_test__result { display: grid; gap: 6px; }
+.as_test__result pre { max-height: 240px; overflow: auto; }
+
+.as_repeat_note {
+    margin: 0;
+    padding: 8px 10px;
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--accent) 8%, transparent);
+    color: var(--text-pri);
+}
+
+.as_test__empty {
+    margin: 0;
+    padding: 8px 10px;
+    border-radius: 8px;
+    background: color-mix(in srgb, #d97706 10%, transparent);
+    color: var(--text-pri);
+}
+
+.as_extra--helper { background: color-mix(in srgb, var(--accent) 12%, transparent); color: var(--accent); }

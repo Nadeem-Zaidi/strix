@@ -792,6 +792,24 @@ button.sidebar_user_profile .user_info {
     outline-offset: 1px;
 }
 
+.chat_history_delete { margin-left: 0; }
+
+.chat_history_delete:hover:not(:disabled) {
+    background: var(--danger-soft);
+    color: var(--danger);
+}
+
+.chat_history_delete:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+/* Touch screens have no hover: keep pin and delete visible. */
+@media (hover: none) {
+    .chat_history_pin { display: inline-flex; }
+    .chat_history_time { display: none; }
+}
+
 .chat_pin_error {
     margin: 8px 10px 0;
     padding: 6px 8px;

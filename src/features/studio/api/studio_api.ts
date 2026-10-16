@@ -66,6 +66,10 @@ class StudioApi extends BaseApi {
   remove(id: string) { return this.delete<{ agents_kept: number }>(`/studio/${id}`); }
   run(id: string, input: string) { return this.post<PipelineRun>(`/studio/${id}/run`, { input }); }
   rotateWebhook(id: string) { return this.post<StudioProject>(`/studio/${id}/webhook/rotate`, {}); }
+  // One agent with sample input, as set up on the canvas now (nothing saved).
+  testStep(body: { node: StudioNode; subs: StudioNode[]; input: string }) {
+    return this.post<{ output: string; error: string | null; prompt: string; duration_ms: number }>("/studio/test-step", body);
+  }
 }
 
 export const studioApi = new StudioApi();

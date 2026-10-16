@@ -1,12 +1,14 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Clock, MessageSquare, MoreHorizontal, Pencil, Play, Plug, Plus, Sparkles, Trash2, Wrench } from "lucide-react";
+import { Clock, Download, MessageSquare, MoreHorizontal, Pencil, Play, Plug, Plus, Sparkles, Trash2, Upload, Wrench } from "lucide-react";
 import { agentsApi } from "@/features/agents/api/agents_api";
 import type { AgentSummary } from "@/features/agents/types";
 import { AgentAvatar } from "@/shared/ui/agent_avatar";
 import { Button, ConfirmDialog } from "@/shared/ui/ui";
 import { AgentsNav } from "@/features/pipelines/components/pipelines_page";
 import { RunDialog } from "@/features/agents/components/run_dialog";
+import { downloadJson, portableApi } from "@/features/portable/api/portable_api";
+import { ImportDialog } from "@/features/portable/components/import_dialog";
 
 // Ideas shown when the user has no agents yet — clicking one opens the
 // editor with the description pre-filled for "Generate with AI".
@@ -33,6 +35,18 @@ export const AgentsPage = () => {
   const [deleting, setDeleting] = useState<AgentSummary | null>(null);
   const [running, setRunning] = useState<AgentSummary | null>(null);
   const [busy, setBusy] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  const exportAgent = async (a: AgentSummary) => {
+    setMenuFor(null);
+    try {
+      downloadJson(await portableApi.exportAgent(a.id), a.name);
+      setNotice(`Exported “${a.name}”. Tokens and secret values aren't in the file — you add them when importing.`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Couldn't export");
+    }
+  };
 
   useEffect(() => {
     agentsApi.list().then(setAgents).catch((e) => setError(e.message));
@@ -67,10 +81,14 @@ export const AgentsPage = () => {
           <h1 className="ag_page__title">Agents</h1>
           <p className="ag_page__subtitle">Custom assistants with their own instructions, tools and schedules.</p>
         </div>
-        <Button variant="primary" onClick={() => navigate("/agents/new")}><Plus size={16} /> New agent</Button>
+        <div className="pt_head_actions">
+          <Button onClick={() => setImporting(true)}><Upload size={16} /> Import</Button>
+          <Button variant="primary" onClick={() => navigate("/agents/new")}><Plus size={16} /> New agent</Button>
+        </div>
       </header>
 
       {error && <div className="ag_error">{error}</div>}
+      {notice && <div className="mk_notice">{notice}</div>}
 
       {agents === null && !error && (
         <div className="ag_grid">{[0, 1, 2].map((i) => <div key={i} className="ag_card ag_card--skeleton" />)}</div>
@@ -118,6 +136,7 @@ export const AgentsPage = () => {
                         <button type="button" role="menuitem" onClick={() => setRunning(a)}><Play size={14} /> Run</button>
                         <button type="button" role="menuitem" onClick={() => navigate(`/agents/${a.id}`)}><Pencil size={14} /> Edit</button>
                         <button type="button" role="menuitem" onClick={() => navigate(`/agents/${a.id}?tab=schedules`)}><Clock size={14} /> Schedules</button>
+                        <button type="button" role="menuitem" onClick={() => void exportAgent(a)}><Download size={14} /> Export JSON</button>
                         <button type="button" role="menuitem" className="is_danger" onClick={() => setDeleting(a)}><Trash2 size={14} /> Delete</button>
                       </div>
                     )}
@@ -166,6 +185,13 @@ export const AgentsPage = () => {
           onConfirm={confirmDelete}
           onCancel={() => setDeleting(null)}
         />
+      )}
+      {importing && (
+        <ImportDialog onClose={() => setImporting(false)} onDone={(r) => {
+          setImporting(false);
+          setNotice(`Imported ${r.agents.filter((x) => x.created).length} agent(s)${r.projects.length ? ` and ${r.projects.length} project(s)` : ""}.${r.warnings.length ? ` Note: ${r.warnings.join(" ")}` : ""}`);
+          agentsApi.list().then(setAgents).catch(() => {});
+        }} />
       )}
     </div>
   );

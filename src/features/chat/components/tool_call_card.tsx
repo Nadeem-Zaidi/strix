@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { MarkdownOutput } from "@/features/chat/components/markdown_output";
 
 export interface ToolCallCardProps {
   name: string;
@@ -36,7 +37,61 @@ const ICON_BY_STATE: Record<string, string> = {
 // mirrors CodeInterpreterCard's pattern instead: a compact header that's
 // all you see by default, with the raw detail tucked behind a chevron for
 // whenever someone actually wants to inspect it.
-export const ToolCallCard = ({ name, args, result, done, source, serverLabel }: ToolCallCardProps) => {
+// "ask_jira_agent" → "Jira Agent" (until the answer names it).
+const helperName = (tool: string) => tool.replace(/^ask_/, "").replace(/_\d+$/, "").split("_").filter(Boolean).map((w) => w[0].toUpperCase() + w.slice(1)).join(" ");
+const parse = (raw?: string): Record<string, unknown> | null => {
+  try {
+    const v = raw ? JSON.parse(raw) : null;
+    return v && typeof v === "object" ? v : null;
+  } catch {
+    return null;
+  }
+};
+
+// An agent asking another agent: who was asked, the task, and the answer
+// (rendered as Markdown) — not raw JSON.
+const HelperCallCard = ({ name, args, result, done }: ToolCallCardProps) => {
+  const [expanded, setExpanded] = useState(false);
+  const a = parse(args);
+  const r = parse(result);
+  const agent = typeof r?.agent === "string" ? r.agent : helperName(name);
+  const task = typeof a?.task === "string" ? a.task : "";
+  const answer = typeof r?.answer === "string" ? r.answer : !r && result ? result : "";
+  return (
+    <div className={`tool-card helper-card ${done ? "done" : ""}`}>
+      <button type="button" className="tool-card__header" onClick={() => setExpanded((v) => !v)} aria-expanded={expanded}>
+        <div className={`tool-icon-wrap ${done ? "done" : ""}`}>
+          <i className={`ti ${done ? "ti-check" : "ti-robot"}`} aria-hidden="true" />
+        </div>
+        <div className="tool-card__text">
+          <div className="tool-card__title">
+            <span className="tool-card__name">{done ? `Asked ${agent}` : `Asking ${agent}…`}</span>
+            <span className="mcp-badge">Agent</span>
+          </div>
+          <div className="tool-card__status">
+            <span className={`tool-status-dot ${done ? "done" : ""}`} />
+            {done ? (task ? task.slice(0, 90) + (task.length > 90 ? "…" : "") : "Answered") : `${agent} is working on it…`}
+          </div>
+        </div>
+        <span className="tool-card__chevron">{expanded ? "▾" : "▸"}</span>
+      </button>
+      {expanded && (
+        <div className="tool-card__body">
+          {task && <><div className="helper-card__label">Task</div><pre className="tool-card__block"><code>{task}</code></pre></>}
+          {answer && <><div className="helper-card__label">{agent}'s answer</div><MarkdownOutput text={answer} /></>}
+          {!answer && done && result && <pre className="tool-card__block tool-card__block--result"><code>{result}</code></pre>}
+        </div>
+      )}
+    </div>
+  );
+};
+
+export const ToolCallCard = (props: ToolCallCardProps) => {
+  if (props.source === "function" && props.name.startsWith("ask_")) return <HelperCallCard {...props} />;
+  return <PlainToolCallCard {...props} />;
+};
+
+const PlainToolCallCard = ({ name, args, result, done, source, serverLabel }: ToolCallCardProps) => {
   const [expanded, setExpanded] = useState(false);
 
   const prettyArgs = prettyPrint(args);

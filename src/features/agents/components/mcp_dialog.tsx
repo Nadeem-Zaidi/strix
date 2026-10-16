@@ -7,6 +7,7 @@ import { Button, ErrorNote, Field, Modal } from "@/shared/ui/ui";
 // Public servers that work without an account, for a one-click start.
 const POPULAR = [
   { name: "DeepWiki", url: "https://mcp.deepwiki.com/mcp", hint: "Docs for any public GitHub repo" },
+  { name: "Atlassian", url: "https://mcp.atlassian.com/v2/mcp", hint: "Jira & Confluence — token: your-email:api-token" },
 ];
 
 // Two steps: connect (URL + optional token) → pick which tools the agent may use.
@@ -102,8 +103,10 @@ export const McpDialog = ({ agentId, onAdded, onClose }: {
             <Field label="Name" hint="Shown to you and the model">
               <input className="ag_input" value={name} onChange={(e) => setName(e.target.value)} placeholder="GitHub" />
             </Field>
-            <Field label="Access token (optional)" hint="Sent as “Bearer …”; stored encrypted">
-              <input className="ag_input ag_mono" type="password" value={token} onChange={(e) => setToken(e.target.value)} placeholder="ghp_…" />
+            <Field label="Access token (optional)" hint={url.includes("atlassian.com")
+              ? "Type your Atlassian email, a colon, then the API token: you@company.com:ATATT… (it's turned into the right header). Stored encrypted."
+              : "Sent as “Bearer <token>”; “email:token” is sent as Basic auth; “Basic …” / “Bearer …” as typed. Stored encrypted."}>
+              <input className="ag_input ag_mono" type="password" value={token} onChange={(e) => setToken(e.target.value)} placeholder={url.includes("atlassian.com") ? "you@company.com:ATATT…" : "ghp_…"} />
             </Field>
           </div>
         </>

@@ -36,6 +36,7 @@ import { logOutUser } from "@/features/auth/state/auth_slice";
 import {
   loadSessions,
   setSessionPinned,
+  deleteSession,
   setActiveSession,
   clearCacheMessage,
   setChatMode,
@@ -43,7 +44,8 @@ import {
 import { useLocation, useNavigate } from "react-router-dom";
 import { OwlMark } from "@/shared/ui/owl_icon";
 import { AgentAvatar } from "@/shared/ui/agent_avatar";
-import { Pin, PinOff, Search } from "lucide-react";
+import { Pin, PinOff, Search, Trash2 } from "lucide-react";
+import { ConfirmDialog } from "@/shared/ui/ui";
 import { WhatsAppConnect } from "@/features/whatsapp/components/whatsapp_connect";
 import { TelegramConnect } from "@/features/telegram/components/telegram_connect";
 import { BILLING_CHANGED, billingApi } from "@/features/billing/api/billing_api";
@@ -240,6 +242,19 @@ export const SideDrawer = ({ windowId = "chat-page" }: SideDrawerProps = {}) => 
     setCollapsedOn(next ? null : location.pathname);
     try { localStorage.setItem(MORE_KEY, next ? "1" : "0"); } catch { /* storage blocked */ }
   };
+  // Delete a chat (after confirming). The store clears it from any open window.
+  const [deleting, setDeleting] = useState<{ id: string; title: string } | null>(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const confirmDelete = async () => {
+    if (!deleting) return;
+    setDeleteBusy(true);
+    setPinError(null);
+    const result = await dispatch(deleteSession(deleting.id));
+    setDeleteBusy(false);
+    if (deleteSession.rejected.match(result)) setPinError(result.payload ?? "Couldn't delete the chat");
+    setDeleting(null);
+  };
+
   const togglePin = async (sessionId: string, pinned: boolean) => {
     setPinError(null);
     const result = await dispatch(setSessionPinned({ sessionId, pinned }));
@@ -374,6 +389,16 @@ export const SideDrawer = ({ windowId = "chat-page" }: SideDrawerProps = {}) => 
           onClick={(e) => { e.stopPropagation(); void togglePin(session.id, !pinned); }}
         >
           {pinned ? <PinOff size={13} /> : <Pin size={13} />}
+        </button>
+        <button
+          type="button"
+          className="chat_history_pin chat_history_delete"
+          title={isStreamingInBackground ? "Wait for the reply to finish" : "Delete chat"}
+          aria-label={`Delete "${title}"`}
+          disabled={isStreamingInBackground}
+          onClick={(e) => { e.stopPropagation(); setDeleting({ id: session.id, title }); }}
+        >
+          <Trash2 size={13} />
         </button>
       </div>
     );
@@ -683,6 +708,16 @@ export const SideDrawer = ({ windowId = "chat-page" }: SideDrawerProps = {}) => 
       </div>
       {whatsAppOpen && <WhatsAppConnect mode="connect" onClose={() => setWhatsAppOpen(false)} />}
       {telegramOpen && <TelegramConnect onClose={() => setTelegramOpen(false)} />}
+      {deleting && (
+        <ConfirmDialog
+          title={`Delete “${deleting.title}”?`}
+          message="The chat and all its messages are deleted for good. This can't be undone."
+          confirmLabel="Delete chat"
+          busy={deleteBusy}
+          onConfirm={() => void confirmDelete()}
+          onCancel={() => setDeleting(null)}
+        />
+      )}
     </>
   );
 };
