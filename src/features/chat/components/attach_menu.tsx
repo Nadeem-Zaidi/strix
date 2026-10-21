@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { BookOpenText, Check, FolderOpen, ImagePlus, Paperclip, Plus, Search } from "lucide-react";
+import { BookOpenText, Check, FolderOpen, HardDrive, ImagePlus, Paperclip, Plus, Search } from "lucide-react";
 
 type AttachMenuProps = {
   onFilesSelected: (e: React.ChangeEvent<HTMLInputElement>) => void;
@@ -7,6 +7,9 @@ type AttachMenuProps = {
   onManageKnowledgeBase: () => void;
   kbMode: boolean;
   onToggleKbMode: () => void;
+  // Desktop app only: answer from folders indexed on this computer.
+  localMode?: boolean;
+  onToggleLocalMode?: () => void;
   disabled?: boolean;
 };
 
@@ -19,6 +22,8 @@ export const AttachMenu = ({
   onManageKnowledgeBase,
   kbMode,
   onToggleKbMode,
+  localMode,
+  onToggleLocalMode,
   disabled,
 }: AttachMenuProps) => {
   const [open, setOpen] = useState(false);
@@ -96,6 +101,23 @@ export const AttachMenu = ({
             </span>
             {kbMode && <Check size={16} className="attach_menu__check" />}
           </button>
+
+          {onToggleLocalMode && (
+            <button
+              type="button"
+              role="menuitemcheckbox"
+              aria-checked={!!localMode}
+              className="attach_menu__item"
+              onClick={() => run(onToggleLocalMode)}
+            >
+              <span className="attach_menu__icon"><HardDrive size={16} /></span>
+              <span className="attach_menu__text">
+                <span className="attach_menu__label">Use my local files</span>
+                <span className="attach_menu__hint">Answer from folders on this computer</span>
+              </span>
+              {localMode && <Check size={16} className="attach_menu__check" />}
+            </button>
+          )}
 
           <button type="button" role="menuitem" className="attach_menu__item" onClick={() => run(onExplainDocument)}>
             <span className="attach_menu__icon"><BookOpenText size={16} /></span>

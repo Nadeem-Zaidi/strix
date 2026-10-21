@@ -123,7 +123,7 @@
     width: var(--art-panel-w);
     display: flex;
     flex-direction: column;
-    background: linear-gradient(180deg, #f9f9fb 0%, #f4f4f7 100%);
+    background: linear-gradient(180deg, var(--bg-subtle) 0%, var(--bg-subtle) 100%);
     border-left: 1px solid var(--border);
     box-shadow: -12px 0 32px -18px rgba(16, 16, 24, 0.18);
     animation: art-panel-in 0.24s cubic-bezier(0.2, 0.8, 0.2, 1);

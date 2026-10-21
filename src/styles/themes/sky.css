@@ -1,21 +1,25 @@
 /* ─────────────────────────────────────────────────────────────
    Sky theme — buttons and highlights in #59A5D8, white sidebar.
-   Loaded after every other stylesheet (see main.tsx); `:root:root`
-   outranks the per-feature :root blocks whatever order they load in.
-   Switch the import in main.tsx to theme_sand.css (or remove it) to
-   change the look.
+   Applies when <html data-theme="sky"> (shared/lib/theme.ts). The
+   other rules use :where(), so they win exactly as if the file were global.
 
    Contrast (WCAG): #59A5D8 is light, so text ON it is dark navy
    (#0B2A45, 5.4:1) — white would be 2.7:1. Where blue is used AS
    text (links, active tabs, icons) it's the deeper #2A74A8 (5.0:1).
    ───────────────────────────────────────────────────────────── */
-:root:root {
+:root[data-theme="sky"] {
     --brand: #59a5d8; /* the chosen colour: button fills */
     --brand-hover: #4a97cc;
     --brand-active: #3f8bc0;
     --brand-ink: #0b2a45; /* text on brand fills */
     --brand-text: #2a74a8; /* brand as a text colour */
     --brand-soft: #eaf4fb;
+
+    /* the agent icon */
+    --bot-1: #7cc2ec;
+    --bot-2: #4a97d0;
+    --bot-3: #2b67a6;
+    --bot-face: #ffffff;
 
     /* chat.css + chat_modern.css */
     --bg-app: #f5f8fb;
@@ -60,111 +64,112 @@
     color-scheme: light;
 }
 
-body {
+:where(:root[data-theme="sky"]) body {
     background: var(--bg-app);
     color: var(--text-pri);
 }
 
 /* ── Sidebar: white ── */
-.sidebar {
+:where(:root[data-theme="sky"]) .sidebar {
     background: #ffffff;
     border-right: 1px solid var(--border);
 }
 
-.menu_item.menu_item--active,
-.menu_item--active {
+:where(:root[data-theme="sky"]) .menu_item.menu_item--active,
+:where(:root[data-theme="sky"]) .menu_item--active {
     background: var(--brand-soft);
     color: var(--brand-text);
 }
 
-.menu_item--active .menu_icon {
+:where(:root[data-theme="sky"]) .menu_item--active .menu_icon {
     color: var(--brand-text);
 }
 
 /* ── Primary buttons: the chosen blue with dark text ── */
-.ag_btn--primary,
-.send_btn,
-.btn--primary,
-.upload-btn,
-.wa_away__save {
+:where(:root[data-theme="sky"]) .ag_btn--primary,
+:where(:root[data-theme="sky"]) .send_btn,
+:where(:root[data-theme="sky"]) .btn--primary,
+:where(:root[data-theme="sky"]) .upload-btn,
+:where(:root[data-theme="sky"]) .wa_away__save {
     background: var(--brand);
     border-color: var(--brand);
     color: var(--brand-ink);
     box-shadow: 0 1px 3px rgba(42, 116, 168, 0.25);
 }
 
-.ag_btn--primary:hover:not(:disabled),
-.send_btn:hover:not(:disabled),
-.btn--primary:hover:not(:disabled),
-.upload-btn:hover,
-.wa_away__save:hover:not(:disabled) {
+:where(:root[data-theme="sky"]) .ag_btn--primary:hover:not(:disabled),
+:where(:root[data-theme="sky"]) .send_btn:hover:not(:disabled),
+:where(:root[data-theme="sky"]) .btn--primary:hover:not(:disabled),
+:where(:root[data-theme="sky"]) .upload-btn:hover,
+:where(:root[data-theme="sky"]) .wa_away__save:hover:not(:disabled) {
     background: var(--brand-hover);
     border-color: var(--brand-hover);
     color: var(--brand-ink);
     box-shadow: 0 2px 8px rgba(42, 116, 168, 0.3);
 }
 
-.ag_btn--primary:active:not(:disabled),
-.send_btn:active:not(:disabled) {
+:where(:root[data-theme="sky"]) .ag_btn--primary:active:not(:disabled),
+:where(:root[data-theme="sky"]) .send_btn:active:not(:disabled) {
     background: var(--brand-active);
 }
 
-.send_btn svg, .ag_btn--primary svg {
+:where(:root[data-theme="sky"]) .send_btn svg,
+:where(:root[data-theme="sky"]) .ag_btn--primary svg {
     color: inherit;
 }
 
-.send_btn:disabled {
+:where(:root[data-theme="sky"]) .send_btn:disabled {
     background: var(--border);
     color: var(--text-ter);
     box-shadow: none;
 }
 
-.stop_btn {
+:where(:root[data-theme="sky"]) .stop_btn {
     background: var(--brand-ink);
     color: #ffffff;
 }
 
 /* Tabs and selected states */
-.ag_tab.is_active {
+:where(:root[data-theme="sky"]) .ag_tab.is_active {
     color: var(--brand-text);
     border-bottom-color: var(--brand);
 }
 
-.ag_segmented button.is_active {
+:where(:root[data-theme="sky"]) .ag_segmented button.is_active {
     color: var(--brand-text);
 }
 
 /* ── Spots that had the old indigo hard-coded ── */
-.user_avatar {
+:where(:root[data-theme="sky"]) .user_avatar {
     background: linear-gradient(135deg, #59a5d8, #2a74a8);
 }
 
-.welcome__logo {
+:where(:root[data-theme="sky"]) .welcome__logo {
     background: linear-gradient(145deg, #eaf4fb, #f3f9fd);
     box-shadow: inset 0 0 0 1px rgba(89, 165, 216, 0.25);
 }
 
-.mode_chip button:hover {
+:where(:root[data-theme="sky"]) .mode_chip button:hover {
     background: rgba(89, 165, 216, 0.16);
 }
 
-.source_chip:hover:not(:disabled) {
+:where(:root[data-theme="sky"]) .source_chip:hover:not(:disabled) {
     border-color: rgba(42, 116, 168, 0.45);
 }
 
-.agent-mark {
+:where(:root[data-theme="sky"]) .agent-mark {
     filter: drop-shadow(0 2px 4px rgba(42, 116, 168, 0.25));
 }
 
-.ai-icon {
+:where(:root[data-theme="sky"]) .ai-icon {
     background: linear-gradient(135deg, #59a5d8 0%, #2a74a8 100%);
     box-shadow: 0 10px 24px -6px rgba(42, 116, 168, 0.5);
 }
 
-.ai-icon:hover {
+:where(:root[data-theme="sky"]) .ai-icon:hover {
     box-shadow: 0 14px 30px -6px rgba(42, 116, 168, 0.55);
 }
 
-::selection {
+:where(:root[data-theme="sky"]) ::selection {
     background: rgba(89, 165, 216, 0.3);
 }

@@ -8,6 +8,8 @@ export type AgentCatalog = {
   defaultProvider: string;
   // Python code functions: on when OWNER_EMAILS is set; only owners may write them.
   codeFunctions: { enabled: boolean; canWrite: boolean; email: string | null };
+  // Schedules can email their result when the server has SMTP set up.
+  email?: { enabled: boolean; maxRecipients: number; accountEmail: string | null };
 };
 
 // A Markdown file attached to an agent; added to its instructions.
@@ -30,11 +32,19 @@ export type Agent = {
   skill_ids?: string[];
   // Other agents this one can ask (each becomes an ask_… tool).
   helper_agent_ids?: string[];
+  // null = personal; otherwise shared with that team workspace.
+  workspace_id?: string | null;
+  // Whether you may change it (creator, or a workspace admin).
+  can_edit?: boolean;
   created_at: string;
   updated_at: string;
 };
 
-export type AgentSummary = Agent & { function_count: number; mcp_count: number; code_function_count: number; schedule_count: number };
+export type AgentSummary = Agent & {
+  function_count: number; mcp_count: number; code_function_count: number; schedule_count: number;
+  // Team workspace agents: who made it (null for personal agents).
+  creator_name?: string | null;
+};
 
 export type FunctionParam = { name: string; type: "string" | "number" | "integer" | "boolean"; description?: string; required?: boolean };
 export type FunctionHeader = { key: string; value: string; secret: boolean };
@@ -86,6 +96,8 @@ export type Schedule = {
   weekday: number | null;
   timezone: string;
   deliver_whatsapp: boolean;
+  deliver_email: boolean;
+  email_to: string[];
   enabled: boolean;
   session_id: string | null;
   next_run_at: string | null;
@@ -94,7 +106,7 @@ export type Schedule = {
   summary: string;
 };
 
-export type ScheduleDraft = Pick<Schedule, "name" | "prompt" | "frequency" | "interval_hours" | "time_of_day" | "weekday" | "timezone" | "deliver_whatsapp" | "enabled">;
+export type ScheduleDraft = Pick<Schedule, "name" | "prompt" | "frequency" | "interval_hours" | "time_of_day" | "weekday" | "timezone" | "deliver_whatsapp" | "deliver_email" | "email_to" | "enabled">;
 
 export type AgentRun = {
   id: number;

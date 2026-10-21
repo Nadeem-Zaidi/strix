@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { describeToolUse } from "@/features/chat/lib/tool_usage";
 import { MarkdownOutput } from "@/features/chat/components/markdown_output";
 
 export interface ToolCallCardProps {
@@ -23,6 +24,15 @@ function prettyPrint(raw?: string): string | undefined {
 }
 
 const MAX_RESULT_CHARS = 800;
+
+const KIND_TITLE: Record<string, string> = { skill: "Skill", skill_file: "Reading skill file", function: "Function", mcp: "", agent: "Asking", tool: "" };
+// "load_skill" → "Skill · maximo-fdd-writer", "jira__getjiraissue" → "getjiraissue" (MCP badge says the server).
+function friendlyTitle(name: string, args?: string, serverLabel?: string): string {
+  const u = describeToolUse(name, args, serverLabel);
+  if (!u) return name;
+  const kind = KIND_TITLE[u.kind];
+  return kind ? `${kind} · ${u.label}` : u.label;
+}
 
 const ICON_BY_STATE: Record<string, string> = {
   done: "ti-check",
@@ -122,7 +132,7 @@ const PlainToolCallCard = ({ name, args, result, done, source, serverLabel }: To
 
         <div className="tool-card__text">
           <div className="tool-card__title">
-            <span className="tool-card__name">{name}</span>
+            <span className="tool-card__name" title={name}>{friendlyTitle(name, args, serverLabel)}</span>
             {source === "mcp" && (
               <span className="mcp-badge">MCP{serverLabel ? ` · ${serverLabel}` : ""}</span>
             )}

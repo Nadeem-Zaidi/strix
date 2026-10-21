@@ -20,7 +20,7 @@
     backdrop-filter: saturate(180%) blur(12px);
     -webkit-backdrop-filter: saturate(180%) blur(12px);
     border-bottom: 1px solid transparent;
-    background: rgba(255, 255, 255, 0.85);
+    background: var(--bg-glass);
     justify-content: space-between;
 }
 
@@ -64,7 +64,7 @@
 }
 
 .page::-webkit-scrollbar-thumb {
-    background: #d8d8de;
+    background: var(--scrollbar);
     border-radius: 4px;
 }
 
@@ -86,7 +86,7 @@
     font-weight: 600;
     letter-spacing: 0.03em;
     color: #1d6fe0;
-    background: #e7f0fd;
+    background: var(--info-soft);
     border-radius: 5px;
     padding: 1.5px 6px;
     flex-shrink: 0;
@@ -145,7 +145,7 @@
     width: 52px;
     height: 52px;
     border-radius: 16px;
-    background: linear-gradient(145deg, #eef0ff, #f5f0ff);
+    background: linear-gradient(145deg, var(--accent-soft), var(--accent-soft));
     color: var(--accent);
     box-shadow: inset 0 0 0 1px rgba(79, 70, 229, 0.12);
     margin-bottom: 18px;

@@ -122,8 +122,8 @@
     height: 24px;
     flex-shrink: 0;
     border-radius: 50%;
-    background: var(--text-pri);
-    color: #fff;
+    background: var(--accent);
+    color: var(--accent-ink);
     font-size: 12px;
     font-weight: 700;
 }
@@ -190,7 +190,7 @@
 
 .pl_tl--running {
     border-color: #cfcbfa;
-    background: #faf9ff;
+    background: var(--accent-soft);
 }
 
 .pl_tl__head {

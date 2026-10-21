@@ -311,7 +311,7 @@
 }
 
 .list-item:hover {
-    background-color: #fafbfe;
+    background-color: var(--bg-hover);
     cursor: pointer;
 }
 
@@ -537,7 +537,7 @@
 
 .btn--primary {
     background: linear-gradient(135deg, var(--accent), #7c6ff0);
-    color: #fff;
+    color: var(--accent-ink);
     box-shadow: 0 2px 8px rgba(79, 70, 229, 0.28);
 }
 
@@ -609,7 +609,7 @@
 }
 
 .skeleton {
-    background: linear-gradient(90deg, var(--border-soft) 25%, #e9ebef 37%, var(--border-soft) 63%);
+    background: linear-gradient(90deg, var(--border-soft) 25%, var(--bg-active) 37%, var(--border-soft) 63%);
     background-size: 400% 100%;
     animation: skeleton-shimmer 1.4s ease infinite;
     border-radius: 6px;
@@ -890,7 +890,7 @@
     z-index: 2;
     width: 30px;
     height: 30px;
-    background: rgba(255, 255, 255, 0.9);
+    background: var(--bg-glass);
     border: 1px solid var(--border);
     cursor: pointer;
     color: var(--text-secondary);
@@ -940,7 +940,7 @@
     border: none;
     cursor: pointer;
     background: linear-gradient(135deg, var(--accent), #7c6ff0);
-    color: #fff;
+    color: var(--accent-ink);
     font-size: 13px;
     font-weight: 600;
     box-shadow: 0 2px 8px rgba(79, 70, 229, 0.28);
@@ -1509,8 +1509,8 @@
 
 .rag-badge--indexed {
     color: #15803d;
-    background: #f0fdf4;
-    border-color: #bbf7d0;
+    background: var(--success-soft);
+    border-color: var(--success-border);
 }
 
 .rag-badge--copy,
@@ -1536,7 +1536,7 @@
 
 .rag-index-btn:hover {
     background: var(--accent);
-    color: #ffffff;
+    color: var(--accent-ink);
 }
 
 .rag-index-btn:focus-visible {
@@ -1569,14 +1569,14 @@
 
 .index-notice--success {
     color: #15803d;
-    background: #f0fdf4;
-    border-color: #bbf7d0;
+    background: var(--success-soft);
+    border-color: var(--success-border);
 }
 
 .index-notice--error {
     color: var(--danger);
     background: var(--danger-soft);
-    border-color: #fecaca;
+    border-color: var(--danger-border);
 }
 
 .index-notice__close {

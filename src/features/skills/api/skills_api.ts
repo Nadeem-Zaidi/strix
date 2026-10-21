@@ -8,10 +8,16 @@ export type Skill = {
   description: string;
   content: string;
   enabled: boolean;
+  license?: string | null;
+  source?: string | null;
+  // Files bundled with the skill (from a skill folder / .zip).
+  files?: SkillFile[];
   created_at: string;
   updated_at: string;
 };
-export type SkillSummary = Omit<Skill, "content"> & { chars: number };
+export type SkillFile = { path: string; kind: "reference" | "script"; bytes: number };
+export type SkillSummary = Omit<Skill, "content" | "files"> & { chars: number; file_count?: number };
+export type ZipImportResult = Skill & { files: SkillFile[]; skipped: { path: string; reason: string }[] };
 export type SkillInput = Pick<Skill, "name" | "description" | "content" | "enabled">;
 
 // Client for /api/skills (backend routes/skill_routes.ts).
@@ -25,6 +31,10 @@ class SkillsApi extends BaseApi {
   update(id: string, body: Partial<SkillInput>) { return this.put<Skill>(`/skills/${encodeURIComponent(id)}`, body); }
   remove(id: string) { return this.delete<void>(`/skills/${encodeURIComponent(id)}`); }
   importMarkdown(markdown: string, fileName: string) { return this.post<Skill>("/skills/import", { markdown, fileName }); }
+  // A whole skill folder (SKILL.md + reference files + scripts) as a .zip.
+  importZip(zipBase64: string, fileName: string) { return this.post<ZipImportResult>("/skills/import-zip", { zip: zipBase64, fileName }); }
+  getFile(id: string, path: string) { return this.get<SkillFile & { content: string }>(`/skills/${encodeURIComponent(id)}/file`, { path }); }
+  deleteFile(id: string, path: string) { return this.delete<void>(`/skills/${encodeURIComponent(id)}/file`, { path }); }
 }
 
 export const skillsApi = new SkillsApi();

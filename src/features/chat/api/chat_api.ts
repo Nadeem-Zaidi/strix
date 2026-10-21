@@ -1,4 +1,5 @@
 import type { DocumentContent, KnowledgeDocument, LLMFileUploadResponse, LLMMessage, MessageUsage, Session, WhatsAppLinkCode, WhatsAppStatus } from "@/shared/types";
+import { workspaceHeaders } from "@/shared/lib/workspace";
 import { BaseApi } from "@/shared/api/base_fetch";
 
 export type StreamChunk = {
@@ -25,7 +26,8 @@ export type StreamChunk = {
         | string;
     tool_call_id?: string;
     name?: string;
-    args?: string;              // used by function_call_arguments AND mcp_call_arguments (aligned naming)
+    args?: string;              // mcp_call_arguments
+    arguments?: string;         // function_call_arguments (what the providers send)
     output?: string;
     title?: string;
     code?: string;
@@ -206,7 +208,7 @@ class Api extends BaseApi {
     private async storageGet<T>(path: string): Promise<T> {
         const headers = await this.getHeader();
         const response = await fetch(`${this.storageBaseUrl}${path}`, {
-            headers: { Authorization: headers.Authorization },
+            headers: { Authorization: headers.Authorization, ...workspaceHeaders() },
         });
         if (!response.ok) {
             let message = `Request failed (${response.status})`;
@@ -222,7 +224,7 @@ class Api extends BaseApi {
 
     async uploadFile(file: File): Promise<LLMFileUploadResponse> {
         const headers = await this.getHeader();
-        const authHeaders: Record<string, string> = { Authorization: headers.Authorization };
+        const authHeaders: Record<string, string> = { Authorization: headers.Authorization, ...workspaceHeaders() };
 
         const formData = new FormData();
         formData.append("files", file);
@@ -289,7 +291,7 @@ class Api extends BaseApi {
         filenameHint?: string
     ): Promise<{ blob: Blob; filename: string; contentType: string }> {
         const headers = await this.getHeader();
-        const authHeaders: Record<string, string> = { Authorization: headers.Authorization };
+        const authHeaders: Record<string, string> = { Authorization: headers.Authorization, ...workspaceHeaders() };
 
         const response = await fetch(`${this.baseUrl}/code_interpreter/files/${containerId}/${fileId}`, {
             headers: authHeaders,

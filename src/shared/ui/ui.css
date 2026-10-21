@@ -88,15 +88,16 @@
     cursor: default;
 }
 
+/* Primary = the theme's accent (themes may restyle it further). */
 .ag_btn--primary {
-    background: var(--text-pri);
-    border-color: var(--text-pri);
-    color: #fff;
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--accent-ink);
 }
 
 .ag_btn--primary:hover:not(:disabled) {
-    background: #000;
-    border-color: #000;
+    background: var(--accent-hover);
+    border-color: var(--accent-hover);
 }
 
 .ag_btn--ghost {
@@ -144,7 +145,7 @@
 }
 
 .ag_icon_btn--danger:hover:not(:disabled) {
-    background: #fdf1f1;
+    background: var(--danger-soft);
     color: #c0392b;
 }
 
@@ -265,8 +266,8 @@ select.ag_input {
 .ag_error {
     padding: 10px 14px;
     border-radius: 10px;
-    background: #fdf1f1;
-    border: 1px solid #f4c2c2;
+    background: var(--danger-soft);
+    border: 1px solid var(--danger-border);
     color: #b03a2e;
     font-size: 13.5px;
     margin-bottom: 12px;
@@ -275,8 +276,8 @@ select.ag_input {
 .ag_notice {
     padding: 10px 14px;
     border-radius: 10px;
-    background: #eef7f1;
-    border: 1px solid #c7eed6;
+    background: var(--success-soft);
+    border: 1px solid var(--success-border);
     color: #1f6f43;
     font-size: 13.5px;
     margin-bottom: 12px;

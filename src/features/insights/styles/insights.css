@@ -145,7 +145,7 @@
 }
 
 .srch_result mark {
-    background: #fff1a8;
+    background: var(--mark-bg);
     color: inherit;
     border-radius: 3px;
     padding: 0 1px;
@@ -165,7 +165,7 @@
 }
 
 .srch_badge--wa {
-    background: #e7f8ee;
+    background: var(--success-soft);
     color: #137a43;
 }
 

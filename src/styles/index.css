@@ -40,12 +40,21 @@
 @import "../features/pipelines/styles/pipelines.css";
 @import "../features/studio/styles/studio.css";
 @import "../features/automations/styles/automations.css";
+@import "../features/local_knowledge/styles/local_knowledge.css";
 @import "../features/portable/styles/portable.css";
+@import "../features/workspaces/styles/workspaces.css";
 @import "../features/native_agents/styles/native_agents.css";
 @import "../features/billing/styles/billing.css";
 @import "../features/insights/styles/insights.css";
 @import "../features/settings/styles/settings.css";
 @import "../features/artifacts/styles/artifacts.css";
 
-/* Theme — swap for ./themes/sand.css (or remove) to change the look. */
+/* Themes — each applies only under <html data-theme="…"> (picked in
+   Settings → Appearance; see shared/lib/theme.ts). No attribute = the
+   base tokens above ("Indigo"). */
 @import "./themes/sky.css";
+@import "./themes/slate.css";
+@import "./themes/sage.css";
+@import "./themes/graphite.css";
+@import "./themes/rust.css";
+@import "./themes/dark.css";

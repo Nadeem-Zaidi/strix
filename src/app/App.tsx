@@ -1,4 +1,6 @@
 import { Outlet, Route, Routes } from "react-router-dom";
+import { JoinWorkspacePage } from "@/features/workspaces/components/join_workspace_page";
+import { WorkspaceSettingsPage } from "@/features/workspaces/components/workspace_settings_page";
 import { AppShell } from "@/app/app_shell";
 import { AuthMain } from "@/features/auth/components/auth_page";
 import { RequireAuth } from "@/features/auth/components/require_auth";
@@ -12,12 +14,14 @@ import { WorkflowEditor } from "@/features/pipelines/components/workflow_editor"
 import { StudioPage } from "@/features/studio/components/studio_page";
 import { StudioEditor } from "@/features/studio/components/studio_editor";
 import { AutomationsPage } from "@/features/automations/components/automations_page";
+import { LocalKnowledgePage } from "@/features/local_knowledge/components/local_knowledge_page";
 import { NativeAgentsPage } from "@/features/native_agents/components/native_agents_page";
 import { SearchPage } from "@/features/insights/components/search_page";
 import { UsagePage } from "@/features/insights/components/usage_page";
 import { BillingPage } from "@/features/billing/components/billing_page";
 import { ApiKeysPage } from "@/features/settings/components/api_keys_page";
 import { MemoryPage } from "@/features/settings/components/memory_page";
+import { AppearancePage } from "@/features/settings/components/appearance_page";
 import { SkillsPage } from "@/features/skills/components/skills_page";
 import { DocumentStylePage } from "@/features/documents/components/document_style_page";
 import { ModelsPage } from "@/features/marketplace/components/models_page";
@@ -50,6 +54,7 @@ function App() {
           <Route path="/pipelines/:id" element={<PipelineEditor />} />
           <Route path="/pipelines/:id/flow" element={<WorkflowEditor />} />
           <Route path="/reminders" element={<AutomationsPage />} />
+          <Route path="/local-knowledge" element={<LocalKnowledgePage />} />
           <Route path="/studio" element={<StudioPage />} />
           <Route path="/studio/new" element={<StudioEditor />} />
           <Route path="/studio/:id" element={<StudioEditor />} />
@@ -59,6 +64,9 @@ function App() {
           <Route path="/billing" element={<BillingPage />} />
           <Route path="/settings/keys" element={<ApiKeysPage />} />
           <Route path="/settings/memory" element={<MemoryPage />} />
+          <Route path="/settings/appearance" element={<AppearancePage />} />
+          <Route path="/settings/workspace" element={<WorkspaceSettingsPage />} />
+          <Route path="/join/:token" element={<JoinWorkspacePage />} />
           <Route path="/skills" element={<SkillsPage />} />
           <Route path="/settings/documents" element={<DocumentStylePage />} />
           <Route path="/models" element={<ModelsPage />} />

@@ -5,6 +5,9 @@ import { BrowserRouter } from "react-router-dom";
 import "@/styles/index.css";
 import App from "@/app/App";
 import { store } from "@/app/store";
+import { initTheme } from "@/shared/lib/theme";
+
+initTheme();
 
 createRoot(document.getElementById("root")!).render(
   <BrowserRouter>

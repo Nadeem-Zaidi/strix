@@ -217,7 +217,7 @@
     height: 32px;
     flex-shrink: 0;
     border-radius: 9px;
-    background: linear-gradient(135deg, var(--accent-soft), #e0f2fe);
+    background: linear-gradient(135deg, var(--accent-soft), var(--info-soft));
     color: var(--accent);
     font: 700 11px var(--font);
     letter-spacing: 0.02em;
@@ -586,7 +586,7 @@
 }
 
 .mk_warn {
-    background: #fff7e6;
+    background: var(--warning-soft);
     color: #8a5a00;
 }
 
@@ -996,7 +996,7 @@
 }
 
 .mk_badge--feat {
-    background: #fff4d6;
+    background: var(--warning-soft);
     color: #8a5a00;
 }
 

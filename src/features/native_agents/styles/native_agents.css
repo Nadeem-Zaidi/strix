@@ -28,12 +28,12 @@
 }
 
 .na_badge--anthropic {
-    background: #fbeee6;
+    background: var(--warning-soft);
     color: #9a4a1c;
 }
 
 .na_badge--openai {
-    background: #e8f3ee;
+    background: var(--success-soft);
     color: #1d6b4b;
 }
 

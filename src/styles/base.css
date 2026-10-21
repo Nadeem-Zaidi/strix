@@ -7,7 +7,7 @@ body {
     margin: 0;
     overflow: hidden;
     font-family: 'DM Sans', sans-serif;
-    background: #f7f6f4;
+    background: var(--bg-app);
 }
 
 h1,
@@ -64,7 +64,7 @@ code {
 }
 
 ::-webkit-scrollbar-thumb {
-    background: #d4d4da;
+    background: var(--scrollbar);
     border-radius: 4px;
 }
 

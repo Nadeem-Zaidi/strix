@@ -61,8 +61,8 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    background: rgba(255, 255, 255, 0.6);
-    border: 1px solid var(--border-subtle, #E5E5E8);
+    background: color-mix(in srgb, var(--bg-surface) 60%, transparent);
+    border: 1px solid var(--border);
     border-radius: 10px;
     padding: 8px 12px;
     max-width: 220px;
@@ -71,7 +71,7 @@
 }
 
 .user_message_file:hover {
-    background: rgba(255, 255, 255, 0.85);
+    background: var(--bg-glass);
 }
 
 .user_message_file_icon {
@@ -83,7 +83,7 @@
     height: 24px;
     padding: 0 6px;
     border-radius: 6px;
-    background: #fff;
+    background: var(--bg-surface);
     font-size: 10px;
     font-weight: 700;
     letter-spacing: 0.3px;
@@ -302,7 +302,7 @@
 }
 
 .tool-card.done {
-    border-color: #bfeed8;
+    border-color: var(--success-border);
 }
 
 .tool-card__header {
@@ -455,8 +455,8 @@
     align-items: flex-start;
     gap: 8px;
     padding: 10px 14px;
-    background: #fdf1f1;
-    border: 1px solid #f4c2c2;
+    background: var(--danger-soft);
+    border: 1px solid var(--danger-border);
     color: #c0392b;
     font-size: 13px;
     max-width: 80%;
@@ -526,8 +526,8 @@
     border-radius: 4px;
     font-size: 12.5px;
     font-family: var(--font-mono);
-    color: #b4235a;
-    background: #f6f2f5;
+    color: var(--code-ink);
+    background: var(--bg-code);
 }
 
 .table_wrapper {
@@ -585,7 +585,7 @@
 }
 
 .md_table tbody .md_tr:nth-child(even) {
-    background: #fbfbfc;
+    background: var(--bg-subtle);
 }
 
 .md_table tbody .md_tr:nth-child(even):hover {
@@ -629,7 +629,7 @@
 }
 
 .code-interpreter-card.done {
-    border-color: #bfeed8;
+    border-color: var(--success-border);
 }
 
 .code-interpreter-card.failed {
@@ -1003,3 +1003,40 @@
     text-transform: uppercase;
     letter-spacing: 0.03em;
 }
+
+/* "Used: Skill … · Function …" under an answer */
+.used_tools {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    margin-top: 10px;
+}
+
+.used_tools__label {
+    margin-right: 2px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-ter);
+}
+
+.used_chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    max-width: 280px;
+    padding: 3px 9px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: var(--bg-subtle);
+    font-size: 12px;
+    color: var(--text-sec);
+}
+
+.used_chip svg { flex-shrink: 0; color: var(--text-ter); }
+.used_chip__kind { font-weight: 600; color: var(--text-pri); }
+.used_chip__name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-mono); font-size: 11.5px; }
+.used_chip__detail { color: var(--text-ter); font-size: 11px; }
+
+.used_chip--skill { border-color: var(--accent-border); background: var(--accent-soft); }
+.used_chip--skill svg { color: var(--accent); }

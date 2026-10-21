@@ -1,11 +1,22 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="sky">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="theme-color" content="#2a74a8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Owl Bot</title>
+    <!-- Theme before first paint (no flash). Mirrors shared/lib/theme.ts. -->
+    <script>
+      (function () {
+        var ids = ["sky", "slate", "sage", "graphite", "rust", "indigo", "dark"], pref = "sky";
+        try { var v = localStorage.getItem("owl_theme"); if (v === "system" || ids.indexOf(v) >= 0) pref = v; } catch (e) {}
+        var dark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+        var id = pref === "system" ? (dark ? "dark" : "sky") : pref;
+        document.documentElement.setAttribute("data-theme", id);
+        document.documentElement.style.colorScheme = id === "dark" ? "dark" : "light";
+      })();
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <!-- App UI (Sora, Inter) and sign-in page (Syne, Playfair Display, Space Mono, DM Sans). -->
@@ -55,6 +66,10 @@
         border-radius: inherit; background: linear-gradient(90deg, #59a5d8, #2a74a8);
         animation: owl-bar 1.3s ease-in-out infinite;
       }
+      [data-theme="dark"] .owl-splash { background: radial-gradient(circle at 50% 42%, #1a2530 0, #111418 58%); }
+      [data-theme="dark"] .owl-splash__name { color: #e6e9ed; }
+      [data-theme="dark"] .owl-splash__bar { background: #24323f; }
+      [data-theme="dark"] .owl-splash__branch { stroke: #3b4450; }
       @keyframes owl-fade-in { from { opacity: 0; } to { opacity: 1; } }
       @keyframes owl-glow { 0%, 100% { transform: scale(0.9); opacity: 0.7; } 50% { transform: scale(1.08); opacity: 1; } }
       @keyframes owl-breathe { 0%, 100% { transform: scale(1, 1); } 50% { transform: scale(1.02, 0.975); } }

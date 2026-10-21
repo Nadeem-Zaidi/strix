@@ -30,7 +30,7 @@
     width: 32px;
     height: 32px;
     border-radius: 10px;
-    background: #e7f8ee;
+    background: var(--success-soft);
     color: #128c4b;
     font-size: 18px;
 }
@@ -151,9 +151,9 @@
     align-items: center;
     gap: 12px;
     padding: 12px 14px;
-    border: 1px solid #c7eed6;
+    border: 1px solid var(--success-border);
     border-radius: 12px;
-    background: #f1fbf5;
+    background: var(--success-soft);
 }
 
 .wa_modal__success div {
@@ -190,7 +190,7 @@
 }
 
 .wa_modal__note--error {
-    background: #fdf1f1;
+    background: var(--danger-soft);
     color: #c0392b;
 }
 
@@ -223,8 +223,8 @@
 }
 
 .wa_away.is_on {
-    border-color: #b7e4c7;
-    background: #f6fcf8;
+    border-color: var(--success-border);
+    background: var(--success-soft);
 }
 
 .wa_away--loading {
@@ -252,7 +252,7 @@
 }
 
 .wa_away.is_on .wa_away__icon {
-    background: #e7f8ee;
+    background: var(--success-soft);
     color: #128c4b;
 }
 
@@ -280,7 +280,7 @@
     flex: none;
     border: none;
     border-radius: 999px;
-    background: var(--border-strong, #d4d4d8);
+    background: var(--border-strong);
     cursor: pointer;
     transition: background 0.15s;
 }
@@ -424,8 +424,8 @@
     padding: 8px 14px;
     border: none;
     border-radius: 10px;
-    background: var(--text-pri);
-    color: var(--bg-surface);
+    background: var(--accent);
+    color: var(--accent-ink);
     font: inherit;
     font-size: 13px;
     font-weight: 600;

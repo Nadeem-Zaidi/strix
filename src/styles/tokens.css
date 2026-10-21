@@ -38,6 +38,28 @@
     --danger-hover: #b91c1c;
     --danger-soft: #fef2f2;
     --success: #16a34a;
+    /* Soft tints for notices, badges and states (the dark theme swaps them). */
+    --success-soft: #edf9f1;
+    --success-border: #c7eed6;
+    --danger-border: #f4c2c2;
+    --warning: #d97706;
+    --warning-soft: #fff6e8;
+    --warning-ink: #8a5a00;
+    --info-soft: #eef6ff;
+    --accent-border: #dcd9fb;
+    --mark-bg: #fff1a8;
+    --scrollbar: #d4d4da;
+    --code-ink: #b4235a; /* inline `code` in answers */
+    /* The default agent icon (shared/ui/agent_avatar.tsx): tile gradient, face. */
+    --bot-1: #a7a2f7;
+    --bot-2: #6d63ea;
+    --bot-3: #4338ca;
+    --bot-face: #ffffff;
+    /* Glassy bars over scrolling content (top bar, save bar). */
+    --bg-glass: color-mix(in srgb, var(--bg-surface) 88%, transparent);
+    /* Document previews stay "paper" white in every theme. */
+    --paper: #ffffff;
+    --paper-ink: #111827;
     --tool-purple-bg: #eeedfc;
     --tool-purple-fg: #4f46e5;
     --tool-green-bg: #e5f7ef;

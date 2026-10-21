@@ -1,4 +1,5 @@
 import { BaseApi } from "@/shared/api/base_fetch";
+import { workspaceHeaders } from "@/shared/lib/workspace";
 
 // Word/Excel files the assistant created (backend core/documents).
 export type GeneratedFile = { id: string; kind: "word" | "excel"; filename: string; size: number };
@@ -33,7 +34,7 @@ class DocumentsApi extends BaseApi {
   // Authenticated binary fetches (a plain link can't carry the token).
   private async blob(path: string): Promise<Blob> {
     const headers = await this.getHeader();
-    const res = await fetch(`${this.baseUrl}${path}`, { headers: { Authorization: headers.Authorization } });
+    const res = await fetch(`${this.baseUrl}${path}`, { headers: { Authorization: headers.Authorization, ...workspaceHeaders() } });
     if (!res.ok) {
       let message = "Download failed";
       try { message = (await res.json()).message ?? message; } catch { /* not JSON */ }

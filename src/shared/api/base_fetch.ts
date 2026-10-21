@@ -1,4 +1,5 @@
 import { onAuthStateChanged } from "firebase/auth";
+import { onWorkspaceForbidden, workspaceHeaders } from "@/shared/lib/workspace";
 import { auth } from "@/shared/lib/firebase";
 
 export abstract class BaseApi {
@@ -24,6 +25,8 @@ export abstract class BaseApi {
         return {
             "Content-Type": "application/json",
             Authorization: `Bearer ${token}`,
+            // The active team workspace (none = personal space).
+            ...workspaceHeaders(),
         };
 
     }
@@ -44,6 +47,8 @@ export abstract class BaseApi {
 
             try {
                 const error = await response.json();
+                // Removed from the workspace (or it was deleted): back to personal.
+                if (response.status === 403 && error?.code === "workspace_forbidden") onWorkspaceForbidden();
                 message = error.error ?? error.message ?? message;
             } catch {
                 message = await response.text();

@@ -8,6 +8,7 @@ export const DEFAULT_AGENT_ICON = "🤖";
 // Gradient tile with a solid, rounded bot face. Filled shapes (not thin
 // strokes) keep it crisp from 14px sidebar rows up to 64px headers. Sized in
 // `em` so it drops into any spot that showed the emoji and inherits its font-size.
+// Colours come from the theme (--bot-* in styles/tokens.css and themes/*).
 export function AgentMark({ className = "" }: { className?: string }) {
   const id = useId();
   const tile = `${id}-tile`;
@@ -16,9 +17,9 @@ export function AgentMark({ className = "" }: { className?: string }) {
     <svg className={`agent-mark ${className}`} viewBox="0 0 32 32" aria-hidden="true">
       <defs>
         <linearGradient id={tile} x1="4" y1="2" x2="28" y2="30" gradientUnits="userSpaceOnUse">
-          <stop offset="0" stopColor="#7cc2ec" />
-          <stop offset="0.55" stopColor="#4a97d0" />
-          <stop offset="1" stopColor="#2b67a6" />
+          <stop offset="0" style={{ stopColor: "var(--bot-1)" }} />
+          <stop offset="0.55" style={{ stopColor: "var(--bot-2)" }} />
+          <stop offset="1" style={{ stopColor: "var(--bot-3)" }} />
         </linearGradient>
         <linearGradient id={shine} x1="0" y1="0" x2="0" y2="16" gradientUnits="userSpaceOnUse">
           <stop offset="0" stopColor="#fff" stopOpacity="0.28" />
@@ -28,17 +29,17 @@ export function AgentMark({ className = "" }: { className?: string }) {
       <rect width="32" height="32" rx="9.5" fill={`url(#${tile})`} />
       <rect width="32" height="16" rx="9.5" fill={`url(#${shine})`} />
       {/* antenna */}
-      <path d="M16 7.4v3" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" />
-      <circle cx="16" cy="6.6" r="1.7" fill="#fff" />
+      <path d="M16 7.4v3" style={{ stroke: "var(--bot-face)" }} strokeWidth="1.8" strokeLinecap="round" />
+      <circle cx="16" cy="6.6" r="1.7" style={{ fill: "var(--bot-face)" }} />
       {/* ears */}
-      <rect x="4.6" y="15.2" width="2.4" height="5" rx="1.2" fill="#fff" opacity="0.8" />
-      <rect x="25" y="15.2" width="2.4" height="5" rx="1.2" fill="#fff" opacity="0.8" />
+      <rect x="4.6" y="15.2" width="2.4" height="5" rx="1.2" style={{ fill: "var(--bot-face)" }} opacity="0.8" />
+      <rect x="25" y="15.2" width="2.4" height="5" rx="1.2" style={{ fill: "var(--bot-face)" }} opacity="0.8" />
       {/* head */}
-      <rect x="7.6" y="10.6" width="16.8" height="14.2" rx="5.4" fill="#fff" />
+      <rect x="7.6" y="10.6" width="16.8" height="14.2" rx="5.4" style={{ fill: "var(--bot-face)" }} />
       {/* eyes + smile */}
-      <rect x="11.5" y="15" width="2.8" height="4.2" rx="1.4" fill="#2b67a6" />
-      <rect x="17.7" y="15" width="2.8" height="4.2" rx="1.4" fill="#2b67a6" />
-      <path d="M13.9 21.4c1.3.9 2.9.9 4.2 0" fill="none" stroke="#4a97d0" strokeWidth="1.4" strokeLinecap="round" />
+      <rect x="11.5" y="15" width="2.8" height="4.2" rx="1.4" style={{ fill: "var(--bot-3)" }} />
+      <rect x="17.7" y="15" width="2.8" height="4.2" rx="1.4" style={{ fill: "var(--bot-3)" }} />
+      <path d="M13.9 21.4c1.3.9 2.9.9 4.2 0" fill="none" style={{ stroke: "var(--bot-2)" }} strokeWidth="1.4" strokeLinecap="round" />
     </svg>
   );
 }

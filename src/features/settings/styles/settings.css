@@ -552,3 +552,156 @@
     color: var(--accent);
     text-underline-offset: 2px;
 }
+
+/* ── Appearance (theme picker) ── */
+.ap_grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+    gap: 14px;
+}
+
+.ap_card {
+    display: grid;
+    gap: 10px;
+    padding: 10px;
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-md);
+    background: var(--bg-surface);
+    color: var(--text-pri);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: border-color var(--speed), box-shadow var(--speed);
+}
+
+.ap_card:hover { border-color: var(--border-strong); }
+
+.ap_card:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px var(--accent-ring);
+}
+
+.ap_card.is_selected {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-ring);
+}
+
+.ap_card__label {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 6px;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.ap_card__label svg { color: var(--accent); }
+
+.ap_card__hint {
+    flex-basis: 100%;
+    font-size: 12px;
+    font-weight: 400;
+    color: var(--text-sec);
+}
+
+/* the miniature app */
+.ap_preview {
+    position: relative;
+    display: grid;
+    grid-template-columns: 32% 1fr;
+    height: 96px;
+    overflow: hidden;
+    border: 1px solid rgba(127, 127, 127, 0.25);
+    border-radius: 8px;
+}
+
+.ap_preview__side {
+    display: grid;
+    align-content: start;
+    gap: 6px;
+    padding: 10px 8px;
+    border-right: 1px solid rgba(127, 127, 127, 0.2);
+}
+
+.ap_preview__side span,
+.ap_preview__card span {
+    display: block;
+    height: 5px;
+    border-radius: 3px;
+}
+
+.ap_preview__main {
+    display: grid;
+    align-content: start;
+    gap: 8px;
+    padding: 10px;
+}
+
+.ap_preview__card {
+    display: grid;
+    gap: 6px;
+    padding: 8px;
+    border-radius: 6px;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+}
+
+.ap_preview__btn {
+    justify-self: end;
+    width: 38%;
+    height: 12px;
+    border-radius: 6px;
+}
+
+/* System: light and dark halves */
+.ap_preview--split {
+    grid-template-columns: 1fr 1fr;
+}
+
+.ap_preview--split > .ap_preview {
+    height: auto;
+    border: none;
+    border-radius: 0;
+}
+
+.ap_preview__badge {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    display: grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+    background: var(--bg-surface);
+    color: var(--text-pri);
+    box-shadow: var(--shadow-sm);
+}
+
+/* ── quick theme switch in the account menu ── */
+.account_menu__theme {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 2px;
+    margin: 4px 8px 6px;
+    padding: 3px;
+    border-radius: 9px;
+    background: var(--bg-subtle);
+}
+
+.account_menu .account_menu__theme button {
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+    gap: 5px;
+    padding: 5px 4px;
+    border-radius: 7px;
+    font-size: 12px;
+    color: var(--text-sec);
+}
+
+.account_menu .account_menu__theme button.is_active {
+    background: var(--bg-surface);
+    color: var(--text-pri);
+    box-shadow: var(--shadow-xs);
+}

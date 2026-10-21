@@ -95,8 +95,8 @@
 
 .send_btn {
     box-shadow: none;
-    color: #fff;
-    background: var(--text-pri);
+    color: var(--accent-ink);
+    background: var(--accent);
 }
 
 .send_btn:hover {
@@ -170,27 +170,27 @@
 }
 
 .pasted_content_icon.pdf {
-    background: #fbeaea;
+    background: var(--danger-soft);
     color: #a12929;
 }
 
 .pasted_content_icon.docx {
-    background: #e4eef8;
+    background: var(--info-soft);
     color: #1658a0;
 }
 
 .pasted_content_icon.csv {
-    background: #e8f2dc;
+    background: var(--success-soft);
     color: #376510;
 }
 
 .pasted_content_icon.json {
-    background: #faecd8;
+    background: var(--warning-soft);
     color: #7f4c0a;
 }
 
 .pasted_content_icon.txt {
-    background: #f0eff3;
+    background: var(--bg-subtle);
     color: #5a5860;
 }
 
@@ -248,7 +248,7 @@
 }
 
 .pasted_content_remove:hover {
-    background: #fdeeed;
+    background: var(--danger-soft);
     color: #c0392b;
     border-color: #f0a8a8;
 }
@@ -262,20 +262,20 @@
     justify-content: space-between;
     padding: 12px;
     border-radius: 16px;
-    background: var(--surface-primary, #fff);
-    border: 1px solid var(--border-subtle, #E5E5E8);
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
     transition: box-shadow 0.15s ease, border-color 0.15s ease;
 }
 
 .file_card:hover {
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-    border-color: var(--border-strong, #D5D5D9);
+    border-color: var(--border-strong);
 }
 
 .file_card--error {
     border-color: #E8B4AE;
-    background: #FDF3F2;
+    background: var(--danger-soft);
 }
 
 .file_card__name {
@@ -394,8 +394,8 @@
     width: 20px;
     height: 20px;
     border-radius: 50%;
-    border: 1px solid var(--border-subtle, #E5E5E8);
-    background: var(--surface-primary, #fff);
+    border: 1px solid var(--border);
+    background: var(--bg-surface);
     color: var(--text-secondary, #666);
     display: flex;
     align-items: center;
@@ -542,7 +542,7 @@
 }
 
 .send_btn:hover:not(:disabled) {
-    background: #000;
+    background: var(--accent-hover);
     box-shadow: none;
 }
 

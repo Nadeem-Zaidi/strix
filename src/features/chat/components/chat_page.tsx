@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { UsedTools } from "@/features/chat/components/used_tools";
+import { addUsed, describeToolUse, usedForAssistantMessage, type UsedItem } from "@/features/chat/lib/tool_usage";
 import { useSelector } from "react-redux";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { ArrowUp, BookOpenText, Lightbulb, Pin, PinOff, Search, Square, X, Zap } from "lucide-react";
+import { ArrowUp, BookOpenText, HardDrive, Lightbulb, Pin, PinOff, Search, Square, X, Zap } from "lucide-react";
 import { useAppDispatch, useAppSelector } from "@/app/store";
 import { auth } from "@/shared/lib/firebase";
 import { agentsApi } from "@/features/agents/api/agents_api";
@@ -53,6 +55,8 @@ import { faWhatsapp } from "@fortawesome/free-brands-svg-icons";
 import { DocumentCard, SourceChips } from "@/features/chat/components/knowledge_parts";
 import { AgentAvatar } from "@/shared/ui/agent_avatar";
 import { asDocumentPart, buildExplainDocumentParts, displayName, KB_SEARCH_INSTRUCTION } from "@/features/chat/lib/chat_utils";
+import { isDesktop } from "@/shared/lib/desktop";
+import { localContextPart } from "@/features/local_knowledge/lib/local_context";
 
 function greeting(): string {
   const hour = new Date().getHours();
@@ -186,6 +190,8 @@ type SessionStreamState = {
   memories: MemoryEvent[];
   files: GeneratedFile[];
   charts: ChartSpec[];
+  // Skills, skill files, functions, MCP tools and agents used for this answer.
+  used: UsedItem[];
   usage?: MessageUsage;
 };
 
@@ -252,6 +258,9 @@ export const ChatPage = ({
   const [agent, setAgent] = useState<Agent | null>(null);
   const navigate = useNavigate();
   const [kbMode, setKbMode] = useState(false);
+  // Desktop app: send matching passages from local folders with each message.
+  const [localMode, setLocalMode] = useState(false);
+  const [localSearching, setLocalSearching] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [continueOpen, setContinueOpen] = useState(false);
   const [explainingKey, setExplainingKey] = useState<string | null>(null);
@@ -428,6 +437,7 @@ export const ChatPage = ({
       memories: sessionState.memories.length ? sessionState.memories : undefined,
       files: sessionState.files.length ? sessionState.files : undefined,
       charts: sessionState.charts.length ? sessionState.charts : undefined,
+      used: sessionState.used.length ? sessionState.used : undefined,
       ...(sessionState.usage ? { metadata: { usage: sessionState.usage } } : {}),
     } as LLMMessage;
 
@@ -561,12 +571,21 @@ export const ChatPage = ({
   const handleSend = async () => {
     const llmUploadResponse = uploadResults.filter((r): r is LLMFileUploadResponse => !!r);
     if (!input.trim() && !llmUploadResponse.length && !pastedTexts.length) return;
-    if (isStreaming) return;
+    if (isStreaming || localSearching) return;
 
     const content: ContentPart[] = [];
     if (input.trim()) {
       content.push({ type: "text", text: input.trim() } as TextContent);
       if (kbMode) content.push(KB_SEARCH_INSTRUCTION);
+      if (localMode && isDesktop) {
+        setLocalSearching(true);
+        try {
+          const local = await localContextPart(input.trim());
+          if (local) content.push(local.part);
+        } finally {
+          setLocalSearching(false);
+        }
+      }
     }
     for (const pastedText of pastedTexts) {
       content.push({ type: "text", text: pastedText.content } as TextContent);
@@ -668,6 +687,7 @@ export const ChatPage = ({
       memories: [],
       files: [],
       charts: [],
+      used: [],
     };
     dispatch(startSessionStream({ sessionId: sessionIdForStream }));
 
@@ -698,10 +718,11 @@ export const ChatPage = ({
         if (isVisible()) setActiveTools(s.activeTools);
       }
 
-      if (chunk.type === "function_call_args" && chunk.tool_call_id) {
+      // The backend sends "function_call_arguments" with `arguments`.
+      if ((chunk.type === "function_call_arguments" || chunk.type === "function_call_args") && chunk.tool_call_id) {
         s.activeTools = {
           ...s.activeTools,
-          [chunk.tool_call_id]: { ...s.activeTools[chunk.tool_call_id], args: chunk.args ?? "" },
+          [chunk.tool_call_id]: { ...s.activeTools[chunk.tool_call_id], args: chunk.arguments ?? chunk.args ?? "" },
         };
         if (isVisible()) setActiveTools(s.activeTools);
       }
@@ -713,6 +734,11 @@ export const ChatPage = ({
         };
         if (isVisible()) setActiveTools(s.activeTools);
         const calledToolName = s.activeTools[chunk.tool_call_id]?.name;
+        const usedNow = addUsed(s.used, describeToolUse(calledToolName, s.activeTools[chunk.tool_call_id]?.args));
+        if (usedNow !== s.used) {
+          s.used = usedNow;
+          if (s.botMessageAdded) updateBotMessage(s, s.buffer);
+        }
         if (calledToolName === CHART_TOOL) {
           const chart = chartFrom(chunk.output);
           if (chart) {
@@ -774,6 +800,12 @@ export const ChatPage = ({
           [chunk.tool_call_id]: { ...s.activeTools[chunk.tool_call_id], done: true, result: chunk.output },
         };
         if (isVisible()) setActiveTools(s.activeTools);
+        const t = s.activeTools[chunk.tool_call_id];
+        const usedNow = addUsed(s.used, describeToolUse(t?.name ?? "", t?.args, t?.serverLabel ?? "MCP"));
+        if (usedNow !== s.used) {
+          s.used = usedNow;
+          if (s.botMessageAdded) updateBotMessage(s, s.buffer);
+        }
       }
 
       if (chunk.type === "mcp_list_tools") {
@@ -1050,6 +1082,8 @@ export const ChatPage = ({
               const msgCharts = liveCharts && liveCharts.length ? liveCharts : chartsForAssistantMessage(cacheMessages as any[], i);
               const liveFiles = (msg as any).files as GeneratedFile[] | undefined;
               const msgFiles = liveFiles && liveFiles.length ? liveFiles : filesForAssistantMessage(cacheMessages as any[], i);
+              const liveUsed = (msg as { used?: UsedItem[] }).used;
+              const msgUsed = liveUsed && liveUsed.length ? liveUsed : usedForAssistantMessage(cacheMessages, i);
               const liveMemories = (msg as any).memories as MemoryEvent[] | undefined;
               const msgMemories = liveMemories && liveMemories.length
                 ? liveMemories
@@ -1090,6 +1124,7 @@ export const ChatPage = ({
                   {msgMemories.length > 0 && (
                     <MemoryNote events={msgMemories} onManage={() => navigate("/settings/memory")} />
                   )}
+                  <UsedTools items={msgUsed} />
                   {msgSources && msgSources.length > 0 && (
                     <SourceChips
                       sources={msgSources}
@@ -1239,7 +1274,7 @@ export const ChatPage = ({
             onPaste={handlePaste}
             disabled={isStreaming}
             rows={1}
-            placeholder={kbMode ? "Ask about your documents…" : `Message ${agent?.name ?? title}…`}
+            placeholder={kbMode ? "Ask about your documents…" : localMode ? "Ask about your local files…" : `Message ${agent?.name ?? title}…`}
             aria-label="Message"
           />
 
@@ -1254,6 +1289,11 @@ export const ChatPage = ({
                   setKbMode((v) => !v);
                   textareaRef.current?.focus();
                 }}
+                localMode={localMode}
+                onToggleLocalMode={isDesktop ? () => {
+                  setLocalMode((v) => !v);
+                  textareaRef.current?.focus();
+                } : undefined}
                 disabled={isStreaming}
               />
               {kbMode && (
@@ -1261,6 +1301,15 @@ export const ChatPage = ({
                   <Search size={13} />
                   Knowledge base
                   <button type="button" onClick={() => setKbMode(false)} aria-label="Turn off knowledge base search">
+                    <X size={12} />
+                  </button>
+                </span>
+              )}
+              {localMode && (
+                <span className="mode_chip" title="Matching passages from your local folders are sent with each message">
+                  <HardDrive size={13} />
+                  {localSearching ? "Searching local files…" : "Local files"}
+                  <button type="button" onClick={() => setLocalMode(false)} aria-label="Stop using local files">
                     <X size={12} />
                   </button>
                 </span>
@@ -1290,7 +1339,7 @@ export const ChatPage = ({
                   type="button"
                   className="send_btn"
                   onClick={handleSend}
-                  disabled={!input.trim() && !uploadResults.some(Boolean) && !pastedTexts.length}
+                  disabled={localSearching || (!input.trim() && !uploadResults.some(Boolean) && !pastedTexts.length)}
                   aria-label="Send message"
                   title="Send"
                 >

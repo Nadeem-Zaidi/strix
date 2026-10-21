@@ -64,8 +64,9 @@ export const RunDialog = ({ target, onClose }: { target: RunTarget; onClose: () 
       case "function_call":
         if (chunk.tool_call_id) setTools((t) => [...t, { kind: "function", id: chunk.tool_call_id!, name: chunk.name ?? "tool", args: "", done: false }]);
         break;
+      case "function_call_arguments": // what the backend sends
       case "function_call_args":
-        patchTool(chunk.tool_call_id, (t) => (t.kind === "function" ? { ...t, args: chunk.args ?? "" } : t));
+        patchTool(chunk.tool_call_id, (t) => (t.kind === "function" ? { ...t, args: chunk.arguments ?? chunk.args ?? "" } : t));
         break;
       case "function_call_output":
         patchTool(chunk.tool_call_id, (t) => (t.kind === "function" ? { ...t, result: chunk.output ?? "", done: true } : t));

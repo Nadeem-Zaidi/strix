@@ -1,4 +1,5 @@
 import { onAuthStateChanged } from "firebase/auth";
+import { workspaceHeaders } from "@/shared/lib/workspace";
 import { auth } from "@/shared/lib/firebase";
 import type { FilesResult, Message, Session } from "@/shared/types";
 
@@ -21,6 +22,8 @@ export const getAuthHeader = async () => {
   return {
     "Content-Type": "application/json",
     Authorization: `Bearer ${token}`,
+    // The active team workspace (none = personal space).
+    ...workspaceHeaders(),
   };
 };
 
@@ -149,7 +152,8 @@ export const api = {
       const res = await fetch(`${BASE}/upload`, {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${token}`, // ✅ ONLY this
+          Authorization: `Bearer ${token}`,
+          ...workspaceHeaders(),
         },
         body: formData,
       });
@@ -162,42 +166,4 @@ export const api = {
       throw error;
     }
   },
-  createFolder: async (folderName: string) => {
-    const headers = await getAuthHeader();
-    let url: string = `${BASE}/createFolder`;
-    try {
-      const res = await fetch(url, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ folderName: folderName })
-
-      });
-      if (!res.ok) throw new Error("Folder creation failed")
-      const result = await res.json();
-      return result
-    } catch (error) {
-      throw error;
-    }
-  },
-
-  generateRag: async (prefix: string) => {
-    const headers = await getAuthHeader();
-    let url: string = `${BASE}/rag_generator`;
-    try {
-      const res = await fetch(url, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ prefix: prefix })
-      })
-      if (!res.ok) throw new Error("Rag Generation Failed")
-      const result = await res.json()
-      return result
-
-    } catch (error) {
-      throw error
-
-    }
-
-
-  }
 };

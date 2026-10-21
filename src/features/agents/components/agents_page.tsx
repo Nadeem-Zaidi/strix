@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useWorkspaces } from "@/features/workspaces/lib/use_workspaces";
 import { useNavigate } from "react-router-dom";
 import { Clock, Download, MessageSquare, MoreHorizontal, Pencil, Play, Plug, Plus, Sparkles, Trash2, Upload, Wrench } from "lucide-react";
 import { agentsApi } from "@/features/agents/api/agents_api";
@@ -29,6 +30,8 @@ const timeAgo = (iso: string) => {
 
 export const AgentsPage = () => {
   const navigate = useNavigate();
+  // The active team workspace (null in the personal space).
+  const { active: team } = useWorkspaces();
   const [agents, setAgents] = useState<AgentSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [menuFor, setMenuFor] = useState<string | null>(null);
@@ -79,7 +82,11 @@ export const AgentsPage = () => {
       <header className="ag_page__header">
         <div>
           <h1 className="ag_page__title">Agents</h1>
-          <p className="ag_page__subtitle">Custom assistants with their own instructions, tools and schedules.</p>
+          <p className="ag_page__subtitle">
+            {team
+              ? <>Shared with everyone in <strong>{team.name}</strong>. Anyone in the team can use them; creators and admins can change them.</>
+              : "Custom assistants with their own instructions, tools and schedules."}
+          </p>
         </div>
         <div className="pt_head_actions">
           <Button onClick={() => setImporting(true)}><Upload size={16} /> Import</Button>
@@ -134,15 +141,16 @@ export const AgentsPage = () => {
                     {menuFor === a.id && (
                       <div className="ag_menu" role="menu">
                         <button type="button" role="menuitem" onClick={() => setRunning(a)}><Play size={14} /> Run</button>
-                        <button type="button" role="menuitem" onClick={() => navigate(`/agents/${a.id}`)}><Pencil size={14} /> Edit</button>
+                        <button type="button" role="menuitem" onClick={() => navigate(`/agents/${a.id}`)}><Pencil size={14} /> {a.can_edit === false ? "View" : "Edit"}</button>
                         <button type="button" role="menuitem" onClick={() => navigate(`/agents/${a.id}?tab=schedules`)}><Clock size={14} /> Schedules</button>
                         <button type="button" role="menuitem" onClick={() => void exportAgent(a)}><Download size={14} /> Export JSON</button>
-                        <button type="button" role="menuitem" className="is_danger" onClick={() => setDeleting(a)}><Trash2 size={14} /> Delete</button>
+                        {a.can_edit !== false && <button type="button" role="menuitem" className="is_danger" onClick={() => setDeleting(a)}><Trash2 size={14} /> Delete</button>}
                       </div>
                     )}
                   </div>
                 </div>
                 <h3 className="ag_card__name">{a.name}</h3>
+                {team && a.creator_name && <span className="ag_card__by">by {a.creator_name}</span>}
                 <p className="ag_card__desc">{a.description || "No description yet."}</p>
                 <div className="ag_card__chips">
                   {a.model && <span className="ag_chip">{a.model}</span>}
@@ -153,7 +161,7 @@ export const AgentsPage = () => {
                 <div className="ag_card__footer">
                   <span className="ag_muted ag_small">Edited {timeAgo(a.updated_at)}</span>
                   <div className="ag_card__actions">
-                    <Button variant="ghost" onClick={() => navigate(`/agents/${a.id}`)}>Edit</Button>
+                    <Button variant="ghost" onClick={() => navigate(`/agents/${a.id}`)}>{a.can_edit === false ? "View" : "Edit"}</Button>
                     <Button variant="primary" onClick={() => navigate(`/chathome?agent=${a.id}`)}><MessageSquare size={15} /> Chat</Button>
                   </div>
                 </div>

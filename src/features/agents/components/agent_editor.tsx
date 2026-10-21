@@ -90,6 +90,8 @@ export const AgentEditor = () => {
   }, [load]);
 
   const dirty = JSON.stringify(form) !== JSON.stringify(saved);
+  // A team agent you didn't create (and aren't an admin of): view only.
+  const readOnly = detail?.can_edit === false;
   const set = <K extends keyof AgentInput>(key: K, value: AgentInput[K]) => setForm((f) => ({ ...f, [key]: value }));
 
   const generate = async () => {
@@ -158,6 +160,13 @@ export const AgentEditor = () => {
         )}
       </header>
 
+      {readOnly && (
+        <div className="ws_banner" role="note">
+          <Lock size={15} />
+          <span>This team agent is shared with you — you can chat with it, but only its creator or a workspace admin can change it.</span>
+        </div>
+      )}
+
       <nav className="ag_tabs" role="tablist">
         {tabs.map((t) => (
           <button
@@ -176,6 +185,7 @@ export const AgentEditor = () => {
         ))}
       </nav>
 
+      <fieldset className="ws_readonly" disabled={readOnly}>
       {tab === "configure" && catalog && (
         <ConfigureTab
           isNew={isNew}
@@ -191,10 +201,11 @@ export const AgentEditor = () => {
         />
       )}
       {tab === "tools" && detail && <ToolsTab detail={detail} setDetail={setDetail} catalog={catalog} />}
-      {tab === "schedules" && detail && <SchedulesTab detail={detail} setDetail={setDetail} whatsappLinked={whatsappLinked} />}
+      {tab === "schedules" && detail && <SchedulesTab detail={detail} setDetail={setDetail} whatsappLinked={whatsappLinked} email={catalog?.email} />}
+      </fieldset>
       {tab === "activity" && detail && <ActivityTab agentId={detail.id} />}
 
-      {tab === "configure" && (
+      {tab === "configure" && !readOnly && (
         <div className={`ag_savebar ${dirty || isNew ? "is_visible" : ""}`}>
           <ErrorNote message={error} />
           <span className="ag_muted ag_small">{isNew ? "Name your agent, then create it — tools and schedules come next." : justSaved ? "Saved" : "You have unsaved changes"}</span>
@@ -652,7 +663,7 @@ const ToolsTab = ({ detail, setDetail, catalog }: { detail: AgentDetail; setDeta
 };
 
 // ── Schedules ────────────────────────────────────────────────────────────
-const SchedulesTab = ({ detail, setDetail, whatsappLinked }: { detail: AgentDetail; setDetail: (d: AgentDetail) => void; whatsappLinked: boolean }) => {
+const SchedulesTab = ({ detail, setDetail, whatsappLinked, email }: { detail: AgentDetail; setDetail: (d: AgentDetail) => void; whatsappLinked: boolean; email?: AgentCatalog["email"] }) => {
   const navigate = useNavigate();
   const [dialog, setDialog] = useState<{ open: boolean; schedule?: Schedule }>({ open: false });
   const [confirm, setConfirm] = useState<Schedule | null>(null);
@@ -696,7 +707,7 @@ const SchedulesTab = ({ detail, setDetail, whatsappLinked }: { detail: AgentDeta
 
         {detail.schedules.length === 0 ? (
           <button type="button" className="ag_placeholder" onClick={() => setDialog({ open: true })}>
-            <CalendarClock size={18} /> <span><strong>Nothing scheduled</strong> — e.g. a daily briefing at 9:00 sent to your WhatsApp.</span>
+            <CalendarClock size={18} /> <span><strong>Nothing scheduled</strong> — e.g. a daily briefing at 9:00 sent to your WhatsApp or email.</span>
           </button>
         ) : (
           <div className="ag_list">
@@ -706,7 +717,7 @@ const SchedulesTab = ({ detail, setDetail, whatsappLinked }: { detail: AgentDeta
                   <span className="ag_sched_badge"><Clock size={15} /></span>
                   <div className="ag_item__main">
                     <strong>{s.name}</strong>
-                    <span className="ag_item__sub">{s.summary}{s.deliver_whatsapp && " · → WhatsApp"}</span>
+                    <span className="ag_item__sub">{s.summary}{s.deliver_whatsapp && " · → WhatsApp"}{s.deliver_email && s.email_to?.length > 0 && ` · → Email (${s.email_to.length === 1 ? s.email_to[0] : `${s.email_to.length} people`})`}</span>
                   </div>
                   {statusBadge(s)}
                   <Toggle label={s.enabled ? "Pause schedule" : "Resume schedule"} checked={s.enabled} disabled={busy === `toggle:${s.id}`} onChange={(v) => act(`toggle:${s.id}`, async () => replace(await agentsApi.updateSchedule(detail.id, s.id, { enabled: v })))} />
@@ -740,6 +751,7 @@ const SchedulesTab = ({ detail, setDetail, whatsappLinked }: { detail: AgentDeta
           agentName={detail.name}
           initial={dialog.schedule}
           whatsappLinked={whatsappLinked}
+          email={email}
           onClose={() => setDialog({ open: false })}
           onSaved={(s) => { replace(s); setDialog({ open: false }); }}
         />

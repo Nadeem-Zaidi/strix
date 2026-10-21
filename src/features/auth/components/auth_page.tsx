@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, type KeyboardEvent } from 'react';
+import { takeAfterLogin } from '@/shared/lib/workspace';
 import {
     RecaptchaVerifier,
     GoogleAuthProvider,
@@ -15,7 +16,6 @@ import { auth, db } from '@/shared/lib/firebase';
 import { authStart, authSuccess } from '@/features/auth/state/auth_slice';
 import { Firebase_Storage } from '@/features/auth/api/profile_store';
 import { User } from '@/features/auth/model/user';
-import { api } from '@/features/auth/api/auth_api';
 import { OwlLoader } from '@/shared/ui/owl_loader';
 
 
@@ -24,6 +24,24 @@ declare global {
         recaptchaVerifier: RecaptchaVerifier | null;
     }
 }
+
+// Firebase's error codes for the phone step, in plain words.
+const OTP_ERRORS: Record<string, string> = {
+    "auth/provider-already-linked": "This account already has a verified phone number. Please refresh the page.",
+    "auth/credential-already-in-use": "This phone number is already used by another account.",
+    "auth/account-exists-with-different-credential": "This phone number is already used by another account.",
+    "auth/invalid-phone-number": "That phone number doesn't look right. Enter 10 digits.",
+    "auth/missing-phone-number": "Please enter your phone number.",
+    "auth/too-many-requests": "Too many attempts. Please wait a few minutes and try again.",
+    "auth/quota-exceeded": "Too many codes sent today. Please try again later.",
+    "auth/captcha-check-failed": "The security check failed. Please refresh the page and try again.",
+    "auth/network-request-failed": "No connection. Check your internet and try again.",
+    "auth/operation-not-allowed": "Phone sign-in isn't turned on for this app.",
+};
+const otpErrorMessage = (err: unknown) => {
+    const code = (err as { code?: string } | null)?.code;
+    return (code && OTP_ERRORS[code]) || "Couldn't send the code. Please try again.";
+};
 
 export const AuthMain = () => {
     const dispatch = useDispatch<AppDispatch>();
@@ -56,6 +74,30 @@ export const AuthMain = () => {
         return migrated;
     };
 
+    // Last step of sign-in for a user whose phone is verified: create the
+    // profile if it's missing (e.g. an earlier attempt stopped after the OTP),
+    // then go to the app. Never asks for the phone again.
+    const finishSetup = async (user: NonNullable<typeof auth.currentUser>) => {
+        // New token that includes the verified phone number (the server checks it).
+        await user.getIdToken(true);
+        const uid = user.uid.toString().trim();
+        const existing = await loadProfile(uid, user.email);
+        if (!existing) {
+            // New user: just the profile. Their file storage needs no setup —
+            // the server keeps each user's files under "<uid>/" and S3
+            // creates that on the first upload.
+            await database.setOne(uid, new User(
+                uid,
+                user.phoneNumber ?? '',
+                user.displayName ?? '',
+                user.email ?? '',
+                uid,
+                uid,
+            ));
+        }
+        navigate(takeAfterLogin() ?? "/chathome");
+    };
+
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
             if (firebaseUser) {
@@ -74,9 +116,9 @@ export const AuthMain = () => {
                 );
 
                 try {
-                    const profile = await loadProfile(firebaseUser.uid, firebaseUser.email);
-                    if (profile && firebaseUser.phoneNumber) {
-                        navigate('/chathome');
+                    if (firebaseUser.phoneNumber) {
+                        // Phone already verified: finish (creates a missing profile).
+                        await finishSetup(firebaseUser);
                     } else {
                         // Signed in with Google but the phone step isn't done yet
                         // (the server requires a verified phone number).
@@ -110,6 +152,12 @@ export const AuthMain = () => {
                 setStep("email")
                 return;
             }
+            if (currentUser.phoneNumber) {
+                // Verified on an earlier attempt — nothing to send.
+                setLoading(true);
+                await finishSetup(currentUser);
+                return;
+            }
             if (!phone.trim()) {
                 setError('Please enter your phone number');
                 return;
@@ -136,10 +184,10 @@ export const AuthMain = () => {
             setStep('otp');
 
         } catch (err) {
-            console.error("Firestore error:", err);
-            setError('Failed to send OTP.');
+            console.error("Couldn't send the OTP:", err);
+            setError(otpErrorMessage(err));
             window.recaptchaVerifier?.clear();
-            window.recaptchaVerifier = null;     // is it throwing?
+            window.recaptchaVerifier = null;
         } finally {
             setLoading(false);
         }
@@ -168,26 +216,7 @@ export const AuthMain = () => {
         try {
             const currentuser = auth.currentUser;
             if (!currentuser) throw new Error("You were signed out — please sign in again");
-            // New token that includes the verified phone number (the server checks it).
-            await currentuser.getIdToken(true);
-
-            const uid = currentuser.uid.toString().trim();
-            const existing = await loadProfile(uid, currentuser.email);
-            if (!existing) {
-                const createFolder = await api.createFolder(uid);
-                if (!createFolder.success) throw new Error("Couldn't create your workspace");
-                const createFileInFolder = await api.createFolder(`${uid}/strix.st`);
-                if (!createFileInFolder.success) throw new Error("Couldn't create your workspace");
-                await database.setOne(uid, new User(
-                    uid,
-                    currentuser.phoneNumber ?? '',
-                    currentuser.displayName ?? '',
-                    currentuser.email ?? '',
-                    createFolder.folder,
-                    uid,
-                ));
-            }
-            navigate("/chathome");
+            await finishSetup(currentuser);
         } catch (err) {
             setError(err instanceof Error ? err.message : "Couldn't finish setting up your account.");
         } finally {

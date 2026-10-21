@@ -1,5 +1,6 @@
 
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { WorkspaceSwitcher } from "@/features/workspaces/components/workspace_switcher";
 import {
   faBars,
   faPenToSquare,
@@ -23,6 +24,12 @@ import {
   faCode,
   faSackDollar,
   faLayerGroup,
+  faFolderOpen,
+  faPalette,
+  faUsers,
+  faSun,
+  faMoon,
+  faDesktop,
 } from "@fortawesome/free-solid-svg-icons";
 import { faTelegram, faWhatsapp } from "@fortawesome/free-brands-svg-icons";
 import { useSelector } from "react-redux";
@@ -46,6 +53,8 @@ import { OwlMark } from "@/shared/ui/owl_icon";
 import { AgentAvatar } from "@/shared/ui/agent_avatar";
 import { Pin, PinOff, Search, Trash2 } from "lucide-react";
 import { ConfirmDialog } from "@/shared/ui/ui";
+import { isDesktop } from "@/shared/lib/desktop";
+import { themeInfo, useTheme } from "@/shared/lib/theme";
 import { WhatsAppConnect } from "@/features/whatsapp/components/whatsapp_connect";
 import { TelegramConnect } from "@/features/telegram/components/telegram_connect";
 import { BILLING_CHANGED, billingApi } from "@/features/billing/api/billing_api";
@@ -234,6 +243,11 @@ export const SideDrawer = ({ windowId = "chat-page" }: SideDrawerProps = {}) => 
     try { return localStorage.getItem(MORE_KEY) === "1"; } catch { return false; }
   });
   const [collapsedOn, setCollapsedOn] = useState<string | null>(null);
+  // Quick Light / Dark / System switch in the account menu ("Light" keeps
+  // the light theme already chosen, e.g. Indigo).
+  const { pref: themePref, setPref: setThemePref } = useTheme();
+  const lightPref = themePref !== "system" && !themeInfo(themePref).dark ? themePref : "sky";
+  const themeMode = themePref === "system" ? "system" : themeInfo(themePref).dark ? "dark" : "light";
   const onMorePage = location.pathname.startsWith("/pipelines") || location.pathname.startsWith("/studio") || location.pathname.startsWith("/reminders") || location.pathname.startsWith("/skills") || location.pathname.startsWith("/models");
   const showMore = moreOpen || (onMorePage && collapsedOn !== location.pathname);
   const toggleMore = () => {
@@ -439,6 +453,8 @@ export const SideDrawer = ({ windowId = "chat-page" }: SideDrawerProps = {}) => 
           </button>
         </div>
 
+        <WorkspaceSwitcher collapsed={!expanded} onNavigate={(path) => { closeMobileDrawer(); navigate(path); }} />
+
         <ul className="menu">
           <li className="menu_item menu_item--primary" onClick={handleNewChat}>
             <FontAwesomeIcon icon={faPenToSquare} className="menu_icon" />
@@ -475,6 +491,18 @@ export const SideDrawer = ({ windowId = "chat-page" }: SideDrawerProps = {}) => 
             <FontAwesomeIcon icon={faRobot} className="menu_icon" />
             <span>Agents</span>
           </li>
+          {isDesktop && (
+            <li
+              className={`menu_item ${location.pathname.startsWith("/local-knowledge") ? "menu_item--active" : ""}`}
+              onClick={() => {
+                closeMobileDrawer();
+                navigate("/local-knowledge");
+              }}
+            >
+              <FontAwesomeIcon icon={faFolderOpen} className="menu_icon" />
+              <span>Local knowledge</span>
+            </li>
+          )}
           <li
             className="menu_item menu_item--more"
             role="button"
@@ -638,6 +666,17 @@ export const SideDrawer = ({ windowId = "chat-page" }: SideDrawerProps = {}) => 
             <div className="account_menu" role="menu" aria-label="Account"
               style={menuPos ? { left: menuPos.left, bottom: menuPos.bottom, width: menuPos.width } : undefined}>
               <div className="account_menu__email">{auth.currentUser?.email ?? auth.currentUser?.phoneNumber ?? "Signed in"}</div>
+              <div className="account_menu__theme" role="radiogroup" aria-label="Theme">
+                <button type="button" role="radio" aria-checked={themeMode === "light"} className={themeMode === "light" ? "is_active" : ""} onClick={() => setThemePref(lightPref)}>
+                  <FontAwesomeIcon icon={faSun} /> Light
+                </button>
+                <button type="button" role="radio" aria-checked={themeMode === "dark"} className={themeMode === "dark" ? "is_active" : ""} onClick={() => setThemePref("dark")}>
+                  <FontAwesomeIcon icon={faMoon} /> Dark
+                </button>
+                <button type="button" role="radio" aria-checked={themeMode === "system"} className={themeMode === "system" ? "is_active" : ""} onClick={() => setThemePref("system")}>
+                  <FontAwesomeIcon icon={faDesktop} /> Auto
+                </button>
+              </div>
               <button type="button" role="menuitem" className={location.pathname === "/usage" ? "is_active" : ""} onClick={() => goFromMenu("/usage")}>
                 <FontAwesomeIcon icon={faChartColumn} className="account_menu__icon" /> Usage
               </button>
@@ -659,6 +698,12 @@ export const SideDrawer = ({ windowId = "chat-page" }: SideDrawerProps = {}) => 
               </button>
               <button type="button" role="menuitem" className={location.pathname === "/settings/documents" ? "is_active" : ""} onClick={() => goFromMenu("/settings/documents")}>
                 <FontAwesomeIcon icon={faFileWord} className="account_menu__icon" /> Document style
+              </button>
+              <button type="button" role="menuitem" className={location.pathname === "/settings/workspace" ? "is_active" : ""} onClick={() => goFromMenu("/settings/workspace")}>
+                <FontAwesomeIcon icon={faUsers} className="account_menu__icon" /> Team workspace
+              </button>
+              <button type="button" role="menuitem" className={location.pathname === "/settings/appearance" ? "is_active" : ""} onClick={() => goFromMenu("/settings/appearance")}>
+                <FontAwesomeIcon icon={faPalette} className="account_menu__icon" /> Appearance
               </button>
               {isOwner && (
                 <button type="button" role="menuitem" className={location.pathname === "/settings/server" ? "is_active" : ""} onClick={() => goFromMenu("/settings/server")}>

@@ -139,7 +139,7 @@
 }
 
 .ag_menu button.is_danger:hover {
-    background: #fdf1f1;
+    background: var(--danger-soft);
 }
 
 .ag_empty {
@@ -370,8 +370,8 @@
 
 /* describe card */
 .ag_describe {
-    background: linear-gradient(160deg, #f6f5ff 0%, var(--bg-surface) 60%);
-    border-color: #dcd9fb;
+    background: linear-gradient(160deg, var(--accent-soft) 0%, var(--bg-surface) 60%);
+    border-color: var(--accent-border);
 }
 
 .ag_describe.is_collapsed {
@@ -423,7 +423,7 @@
     flex-shrink: 0;
     border-radius: 10px;
     background: var(--accent);
-    color: #fff;
+    color: var(--accent-ink);
 }
 
 .ag_describe__body {
@@ -597,7 +597,7 @@
 
 .ag_builtin.is_on {
     border-color: #cfcbfa;
-    background: #faf9ff;
+    background: var(--accent-soft);
 }
 
 .ag_starter_row {
@@ -692,7 +692,7 @@
     padding: 10px 10px 10px 18px;
     border: 1px solid var(--border);
     border-radius: 16px;
-    background: rgba(255, 255, 255, 0.96);
+    background: var(--bg-glass);
     backdrop-filter: blur(10px);
     box-shadow: var(--shadow-lg);
     transform: translate(-50%, 140%);
@@ -808,22 +808,22 @@
     font-size: 11px;
     font-weight: 700;
     text-align: center;
-    background: #eef6ff;
+    background: var(--info-soft);
     color: #1d63c9;
 }
 
 .ag_method_badge--post {
-    background: #edf9f1;
+    background: var(--success-soft);
     color: #1d8a4b;
 }
 
 .ag_method_badge--put, .ag_method_badge--patch {
-    background: #fff6e8;
+    background: var(--warning-soft);
     color: #b2650c;
 }
 
 .ag_method_badge--delete {
-    background: #fdf1f1;
+    background: var(--danger-soft);
     color: #c0392b;
 }
 
@@ -840,7 +840,7 @@
 }
 
 .ag_sched_badge {
-    background: #fff6e8;
+    background: var(--warning-soft);
     color: #b2650c;
 }
 
@@ -918,12 +918,12 @@
 }
 
 .ag_status--succeeded {
-    background: #edf9f1;
+    background: var(--success-soft);
     color: #1d8a4b;
 }
 
 .ag_status--failed {
-    background: #fdf1f1;
+    background: var(--danger-soft);
     color: #c0392b;
 }
 
@@ -1140,7 +1140,7 @@
 
 .ag_tool.is_on {
     border-color: #cfcbfa;
-    background: #faf9ff;
+    background: var(--accent-soft);
 }
 
 .ag_tool__desc {
@@ -1198,9 +1198,9 @@
     justify-content: space-between;
     gap: 10px;
     padding: 10px 12px;
-    border: 1px solid #dcd9fb;
+    border: 1px solid var(--accent-border);
     border-radius: 12px;
-    background: #f7f6ff;
+    background: var(--accent-soft);
     font-size: 13.5px;
 }
 
@@ -1255,7 +1255,7 @@
     height: 34px;
     flex-shrink: 0;
     border-radius: 10px;
-    background: #eef6ff;
+    background: var(--info-soft);
     color: #1d63c9;
 }
 
@@ -1301,7 +1301,7 @@
 
 /* code functions */
 .ag_method_badge--py {
-    background: #fff6e0;
+    background: var(--warning-soft);
     color: #8a5a00;
 }
 
