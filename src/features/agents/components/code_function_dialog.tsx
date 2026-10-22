@@ -160,7 +160,7 @@ export const CodeFunctionDialog = ({ agentId, initial, onSaved, onClose, api = a
         {fn.secrets.map((s, i) => (
           <div key={i} className="ag_header_row">
             <input className="ag_input ag_mono" placeholder="API_KEY" value={s.key} onChange={(e) => setSecret(i, { key: e.target.value.replace(/[^A-Za-z0-9_]/g, "_") })} />
-            <input className="ag_input ag_mono" type="password" placeholder="value" value={s.value} onFocus={() => s.value === SECRET_MASK && setSecret(i, { value: "" })} onChange={(e) => setSecret(i, { value: e.target.value })} />
+            <input className="ag_input ag_mono" type="password" autoComplete="new-password" placeholder="value" value={s.value} onFocus={() => s.value === SECRET_MASK && setSecret(i, { value: "" })} onChange={(e) => setSecret(i, { value: e.target.value })} />
             <span />
             <button type="button" className="ag_icon_btn" aria-label="Remove secret" onClick={() => set("secrets", fn.secrets.filter((_, j) => j !== i))}><Trash2 size={15} /></button>
           </div>

@@ -106,7 +106,7 @@ export const McpDialog = ({ agentId, onAdded, onClose }: {
             <Field label="Access token (optional)" hint={url.includes("atlassian.com")
               ? "Type your Atlassian email, a colon, then the API token: you@company.com:ATATT… (it's turned into the right header). Stored encrypted."
               : "Sent as “Bearer <token>”; “email:token” is sent as Basic auth; “Basic …” / “Bearer …” as typed. Stored encrypted."}>
-              <input className="ag_input ag_mono" type="password" value={token} onChange={(e) => setToken(e.target.value)} placeholder={url.includes("atlassian.com") ? "you@company.com:ATATT…" : "ghp_…"} />
+              <input className="ag_input ag_mono" type="password" autoComplete="new-password" value={token} onChange={(e) => setToken(e.target.value)} placeholder={url.includes("atlassian.com") ? "you@company.com:ATATT…" : "ghp_…"} />
             </Field>
           </div>
         </>
