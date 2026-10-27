@@ -18,7 +18,7 @@ import { CanvasViewbar } from "@/features/pipelines/components/canvas_viewbar";
 import { useCanvasLayout } from "@/features/pipelines/lib/use_canvas_layout";
 import { studioApi, type Port, type StudioCanvas, type StudioNode, type StudioNodeType, type StudioProject } from "@/features/studio/api/studio_api";
 import {
-  edgeTaken, isSub, newStudioNode, passedOut, PORT_SUB, primaryNodes, SUB_PORT, subsFromAgent, subsOf, toCanvas, type AgentExtras, toEdge, toGraph, traceByNode, uniqueAgentName, upstream, type CanvasNode,
+  edgeTaken, expandParallel, isSub, newStudioNode, passedOut, PORT_SUB, primaryNodes, SUB_PORT, subsFromAgent, subsOf, toCanvas, type AgentExtras, toEdge, toGraph, traceByNode, uniqueAgentName, upstream, type CanvasNode,
 } from "@/features/studio/lib/studio_graph";
 import { blankCanvas, TEMPLATES } from "@/features/studio/lib/studio_templates";
 import { AgentNode, StepNodeCard, SubNodeCard, TriggerNode } from "@/features/studio/components/studio_nodes";
@@ -82,6 +82,23 @@ export const StudioEditor = () => {
   const [ready, setReady] = useState(false);
   const layout = useCanvasLayout("owl.studio");
   const { openPanel } = layout;
+  // Parts (models, tools, knowledge, skills) can be hidden to declutter the
+  // canvas; they stay plugged in and the agent cards still count them.
+  const [partsHidden, setPartsHidden] = useState(() => {
+    try {
+      return localStorage.getItem("owl.studio.parts") === "hidden";
+    } catch {
+      return false;
+    }
+  });
+  const showParts = useCallback((hidden: boolean) => {
+    setPartsHidden(hidden);
+    try {
+      localStorage.setItem("owl.studio.parts", hidden ? "hidden" : "shown");
+    } catch {
+      // private mode etc. — just not remembered
+    }
+  }, []);
 
   const snapshot = (n: string, d: string, dl: boolean, c: StudioCanvas) => JSON.stringify({ n, d, dl, c });
 
@@ -145,7 +162,7 @@ export const StudioEditor = () => {
     return () => clearInterval(t);
   }, [activeId, activeStatus]);
 
-  const traceList = useMemo(() => (active && isTrace(active.steps) ? (active.steps as unknown as FlowTraceEntry[]) : []), [active]);
+  const traceList = useMemo(() => (active && isTrace(active.steps) ? expandParallel(active.steps as unknown as FlowTraceEntry[]) : []), [active]);
   const trace = useMemo(() => traceByNode(traceList), [traceList]);
   const traceOrder = useMemo(() => new Map(traceList.map((t, i) => [t.node_id, i])), [traceList]);
   const passed = useMemo(() => passedOut(traceList), [traceList]);
@@ -209,17 +226,18 @@ export const StudioEditor = () => {
       const ex = node.agent_id ? extras[node.agent_id] : undefined;
       // Helper agents by name (ids → your agents).
       const withNames = ex && { ...ex, helpers: (ex.helpers ?? []).map((id) => myAgents.find((a) => a.id === id)?.name).filter((x): x is string => !!x) };
-      Object.assign(data, { subs: subsOf(home, plainNodes, edges), shared: home !== n.id, onAdd: (port: Port) => addSub(n.id, port), extras: withNames });
+      // Adding a part shows the parts again, so the new one can be seen.
+      Object.assign(data, { subs: subsOf(home, plainNodes, edges), shared: home !== n.id, onAdd: (port: Port) => { showParts(false); addSub(n.id, port); }, extras: withNames });
     }
     if (isSub(node)) data.labels = labels;
-    return { ...n, selected: n.id === selectedId, data };
-  }), [nodes, plainNodes, edges, trace, selectedId, addSub, labels, extras, primary, myAgents]);
+    return { ...n, selected: n.id === selectedId, hidden: partsHidden && isSub(node), data };
+  }), [nodes, plainNodes, edges, trace, selectedId, addSub, labels, extras, primary, myAgents, partsHidden, showParts]);
 
   const shownEdges = useMemo(() => {
     const byId = new Map(plainNodes.map((n) => [n.id, n]));
     const name = (id: string) => { const n = byId.get(id); return n ? (n.type === "agent" ? n.label || n.agent.name : ("label" in n && n.label) || n.type) : id; };
     return edges.map((e) => {
-      if (e.targetHandle && e.targetHandle !== "in") return e;
+      if (e.targetHandle && e.targetHandle !== "in") return partsHidden ? { ...e, hidden: true } : e;
       const taken = traceList.length > 0 && edgeTaken(e, traceOrder, trace);
       const text = taken ? passed.get(e.source) ?? "" : "";
       const data: DataEdgeData = {
@@ -231,7 +249,7 @@ export const StudioEditor = () => {
       };
       return { ...e, type: "data", label: undefined, data };
     });
-  }, [edges, plainNodes, traceList, traceOrder, trace, passed]);
+  }, [edges, plainNodes, traceList, traceOrder, trace, passed, partsHidden]);
 
   const canvas = useMemo(() => toCanvas(nodes, edges), [nodes, edges]);
   const dirty = snapshot(name, description, deliver, canvas) !== saved;
@@ -300,11 +318,15 @@ export const StudioEditor = () => {
         // A sub-node plugs into one agent: re-plugging moves it.
         return addEdge(toEdge({ id: `${c.source}-${target}`, from: c.source, to: target, port }), es.filter((e) => e.source !== c.source));
       }
-      // One connection per output: a new one replaces the old.
+      // One connection per output: a new one replaces the old — except
+      // agent → agent, which adds one: agents on the same output run side by side.
       const branch = (c.sourceHandle ?? undefined) as never;
+      const same = (e: Edge) => e.source === c.source && (e.sourceHandle ?? null) === (c.sourceHandle ?? null) && (!e.targetHandle || e.targetHandle === "in");
+      const isAgent = (id: string) => nodes.find((n) => n.id === id)?.data.node.type === "agent";
+      const fanOut = isAgent(c.target) && es.filter(same).every((e) => isAgent(e.target));
       return addEdge(
         toEdge({ id: `${c.source}-${c.sourceHandle ?? "out"}-${c.target}`, from: c.source, to: c.target, branch }),
-        es.filter((e) => !(e.source === c.source && (e.sourceHandle ?? null) === (c.sourceHandle ?? null) && (!e.targetHandle || e.targetHandle === "in"))),
+        fanOut ? es : es.filter((e) => !same(e)),
       );
     });
   }, [nodes, primary]);
@@ -469,7 +491,12 @@ export const StudioEditor = () => {
 
       <div className={`wf_layout ${layout.panel ? "" : "is_panel_closed"}`}>
         <div className="wf_canvas as_canvas">
-          <CanvasViewbar focus={layout.focus} onFocus={layout.toggleFocus} panel={layout.panel} onPanel={layout.togglePanel} />
+          <CanvasViewbar focus={layout.focus} onFocus={layout.toggleFocus} panel={layout.panel} onPanel={layout.togglePanel}
+            parts={{ hidden: partsHidden, onToggle: () => {
+              // A hidden part can't stay selected.
+              if (!partsHidden && selected && isSub(selected.data.node)) setSelectedId(null);
+              showParts(!partsHidden);
+            } }} />
           <div className="wf_toolbar" role="toolbar" aria-label="Add a node">
             <div className="as_agentmenu">
               <button type="button" className="wf_add" onClick={() => setAgentMenu((v) => !v)} aria-expanded={agentMenu} aria-haspopup="menu">

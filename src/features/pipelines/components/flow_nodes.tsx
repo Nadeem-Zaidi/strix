@@ -1,11 +1,11 @@
 import { memo, useEffect } from "react";
 import { Handle, Position, useUpdateNodeInternals, type NodeProps } from "@xyflow/react";
-import { Bell, CheckCircle2, CirclePlay, Flag, GitFork, LoaderCircle, PauseCircle, Route as RouteIcon, ShieldCheck, XCircle } from "lucide-react";
+import { Bell, CheckCircle2, CirclePlay, Columns3, Flag, GitFork, LoaderCircle, PauseCircle, Route as RouteIcon, ShieldCheck, XCircle } from "lucide-react";
 import { AgentAvatar } from "@/shared/ui/agent_avatar";
 import { nodeLabel, RULE_LABEL, type StepNode } from "@/features/pipelines/lib/flow_graph";
 
 const ICON = {
-  start: <CirclePlay size={15} />, condition: <GitFork size={15} />, router: <RouteIcon size={15} />, approval: <ShieldCheck size={15} />,
+  start: <CirclePlay size={15} />, parallel: <Columns3 size={15} />, condition: <GitFork size={15} />, router: <RouteIcon size={15} />, approval: <ShieldCheck size={15} />,
   notify: <Bell size={15} />, end: <Flag size={15} />,
 };
 
@@ -21,6 +21,7 @@ const summary = (n: StepNode["data"]["node"], agentName?: string): string => {
   switch (n.type) {
     case "start": return "The run's input";
     case "agent": return agentName ?? "Choose an agent";
+    case "parallel": return `${n.branches.length} agents at once${n.require_all ? "" : " · continues if some fail"}`;
     case "condition": return n.mode === "ai" ? `Ask AI: ${n.question || "…"}` : `${n.field || n.source} ${RULE_LABEL[n.op]} ${n.value}`.trim();
     case "router": return `${n.mode === "ai" ? "AI picks" : "First match"} of ${n.routes.length} route${n.routes.length === 1 ? "" : "s"}`;
     case "approval": return n.notify ? "Waits for you · notifies you" : "Waits for you";
@@ -63,8 +64,17 @@ export const StepNodeCard = memo(({ id, data, selected }: NodeProps<StepNode>) =
         <StatusBadge status={data.status} />
       </div>
       <div className="wf_node__sub">{summary(n, data.agent?.name)}</div>
+      {n.type === "parallel" && (
+        <ul className="wf_node__lanes">
+          {n.branches.map((b, i) => (
+            <li key={b.id} title={data.branchAgents?.[i]?.name ?? "Choose an agent"}>
+              {data.branchAgents?.[i] ? <AgentAvatar icon={data.branchAgents[i]!.icon} /> : "❔"} <span>{b.label || "Agent"}</span>
+            </li>
+          ))}
+        </ul>
+      )}
 
-      {(n.type === "start" || n.type === "agent" || n.type === "notify") && <Handle type="source" position={Position.Bottom} className="wf_handle" />}
+      {(n.type === "start" || n.type === "agent" || n.type === "parallel" || n.type === "notify") && <Handle type="source" position={Position.Bottom} className="wf_handle" />}
       {n.type === "condition" && (
         <>
           <Handle type="source" id="true" position={Position.Bottom} className="wf_handle wf_handle--true" style={{ left: "28%" }} />

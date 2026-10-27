@@ -1,7 +1,7 @@
 import { ArrowDown, ArrowUp, Plus, Trash2, X } from "lucide-react";
 import { Field } from "@/shared/ui/ui";
 import type { FlowNode, Route, Rule, RuleOp } from "@/features/pipelines/api/pipelines_api";
-import { newRoute, nodeLabel, RULE_LABEL, type StepNode } from "@/features/pipelines/lib/flow_graph";
+import { newRoute, outputRefs, RULE_LABEL, type StepNode } from "@/features/pipelines/lib/flow_graph";
 
 type RouterNode = Extract<FlowNode, { type: "router" }>;
 
@@ -23,7 +23,7 @@ export const SourceSelect = ({ value, before, onChange }: { value: string; befor
     <select className="ag_input" value={value} onChange={(e) => onChange(e.target.value)}>
       <option value="previous">Previous step's output</option>
       <option value="input">The run's input</option>
-      {before.filter((b) => b.data.node.type === "agent").map((b) => <option key={b.id} value={`node.${b.id}`}>Output of “{nodeLabel(b.data.node)}”</option>)}
+      {outputRefs(before).map((o) => <option key={o.ref} value={o.ref}>Output of “{o.label}”</option>)}
     </select>
   </Field>
 );

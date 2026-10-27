@@ -13,9 +13,13 @@ export type Rule = { field?: string; op: RuleOp; value: string };
 export type RuleGroup = { match: "all" | "any"; rules: Rule[] };
 export type Route = { id: string; label: string; when: RuleGroup; description?: string };
 export type Position = { x: number; y: number };
+// One agent of a parallel step; its answer is {{node.<step id>.<branch id>}}.
+export type ParallelBranch = { id: string; label: string; agent_kind: "agent" | "native"; agent_id: string; instruction: string };
 export type FlowNode =
   | { id: string; type: "start"; position: Position; label?: string }
   | { id: string; type: "agent"; position: Position; label?: string; agent_kind: "agent" | "native"; agent_id: string; instruction: string }
+  // Several agents at once on the same input. require_all: any failed agent fails the run.
+  | { id: string; type: "parallel"; position: Position; label?: string; branches: ParallelBranch[]; require_all: boolean }
   | { id: string; type: "condition"; position: Position; label?: string; mode: "rule"; source: string; field?: string; op: RuleOp; value: string }
   | { id: string; type: "condition"; position: Position; label?: string; mode: "ai"; source: string; question: string }
   | { id: string; type: "router"; position: Position; label?: string; mode: "rule" | "ai"; source: string; routes: Route[]; instructions?: string }
@@ -26,6 +30,16 @@ export type NodeType = FlowNode["type"];
 export type Branch = "true" | "false" | "approved" | "rejected" | "default" | `route:${string}`;
 export type FlowEdge = { id: string; from: string; to: string; branch?: Branch };
 export type Flow = { version: 1; nodes: FlowNode[]; edges: FlowEdge[] };
+
+export type ParallelBranchTrace = {
+  id: string;
+  label: string;
+  agent_name: string;
+  agent_icon: string;
+  status: "pending" | "running" | "succeeded" | "failed";
+  output?: string;
+  error?: string;
+};
 
 export type FlowTraceEntry = {
   node_id: string;
@@ -40,6 +54,7 @@ export type FlowTraceEntry = {
   error?: string;
   branch?: Branch;
   branch_label?: string;
+  branches?: ParallelBranchTrace[];   // parallel steps
   decided_by?: string;
   comment?: string;
   started_at?: string;

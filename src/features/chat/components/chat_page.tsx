@@ -3,13 +3,16 @@ import { UsedTools } from "@/features/chat/components/used_tools";
 import { addUsed, describeToolUse, usedForAssistantMessage, type UsedItem } from "@/features/chat/lib/tool_usage";
 import { useSelector } from "react-redux";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { ArrowUp, BookOpenText, HardDrive, Lightbulb, Pin, PinOff, Search, Square, X, Zap } from "lucide-react";
+import { ArrowUp, BookOpenText, FileSpreadsheet, HardDrive, Lightbulb, Pin, PinOff, Search, Square, X, Zap } from "lucide-react";
 import { useAppDispatch, useAppSelector } from "@/app/store";
 import { auth } from "@/shared/lib/firebase";
 import { agentsApi } from "@/features/agents/api/agents_api";
 import type { Agent } from "@/features/agents/types";
 import { nativeAgentsApi, PROVIDER_LABEL, type NativeAgent } from "@/features/native_agents/api/native_agents_api";
 import { BrowserApprovalCard, BrowserScreenshot, type BrowserApproval, type BrowserApprovalRequest } from "@/features/native_agents/components/browser_approval";
+import { LocalCommandCard, type LocalCommandItem } from "@/features/chat/components/local_command_card";
+import { handleLocalCommand } from "@/features/chat/lib/local_commands";
+import type { LocalCommandRequest } from "@/shared/lib/desktop";
 import type {
   CodeInterpreterContent,
   CodeInterpreterFileRef,
@@ -236,6 +239,9 @@ export const ChatPage = ({
   };
   // Provider agents' hosted browser: pending approvals and the latest screenshot.
   const [browserApprovals, setBrowserApprovals] = useState<BrowserApproval[]>([]);
+  // Commands agents asked to run on this computer (desktop app), per chat;
+  // they stay visible until the next message in that chat.
+  const [localCommands, setLocalCommands] = useState<(LocalCommandItem & { sessionId: string })[]>([]);
   const [browserShot, setBrowserShot] = useState<string | null>(null);
   const { providers, selection, setSelection } = useLLMProvider();
 
@@ -258,6 +264,8 @@ export const ChatPage = ({
   const [agent, setAgent] = useState<Agent | null>(null);
   const navigate = useNavigate();
   const [kbMode, setKbMode] = useState(false);
+  // Word & Excel tools: only sent to the model when turned on (saves ~1.2k tokens a message).
+  const [docsMode, setDocsMode] = useState(false);
   // Desktop app: send matching passages from local folders with each message.
   const [localMode, setLocalMode] = useState(false);
   const [localSearching, setLocalSearching] = useState(false);
@@ -677,6 +685,7 @@ export const ChatPage = ({
     const sessionIdForStream = sessionId;
     setBrowserShot(null);
     setBrowserApprovals([]);
+    setLocalCommands((list) => list.filter((c) => c.sessionId !== sessionIdForStream));
     sessionStreamsRef.current[sessionIdForStream] = {
       buffer: "",
       botMessageAdded: false,
@@ -895,6 +904,14 @@ export const ChatPage = ({
         }
       }
 
+      // Handled even if another chat is on screen: the agent is waiting for the answer.
+      if (chunk.type === "local_command_request" && chunk.request) {
+        const request = chunk.request as LocalCommandRequest;
+        setLocalCommands((list) => [...list, { request, sessionId: sessionIdForStream }]);
+        void handleLocalCommand(request).then((result) =>
+          setLocalCommands((list) => list.map((c) => (c.request.requestId === request.requestId ? { ...c, result } : c))));
+      }
+
       if (chunk.type === "approval_request" && chunk.request && isVisible()) {
         setBrowserApprovals((list) => [...list, { request: chunk.request as BrowserApprovalRequest }]);
       }
@@ -948,7 +965,7 @@ export const ChatPage = ({
         }
         resetSessionStream(sessionIdForStream);
       }
-    }, selection, agentIdForSend, nativeIdForSend);
+    }, selection, agentIdForSend, nativeIdForSend, docsMode ? ["documents"] : []);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -1194,6 +1211,7 @@ export const ChatPage = ({
 
           {browserShot && <BrowserScreenshot image={browserShot} />}
           {browserApprovals.map((a) => <BrowserApprovalCard key={a.request.requestId} approval={a} />)}
+          {localCommands.filter((c) => c.sessionId === activeSessionId).map((c) => <LocalCommandCard key={c.request.requestId} item={c} />)}
 
           {mcpStatus && <div className="mcp_status">{mcpStatus}</div>}
           <div ref={bottomAnchorRef} />
@@ -1289,6 +1307,11 @@ export const ChatPage = ({
                   setKbMode((v) => !v);
                   textareaRef.current?.focus();
                 }}
+                docsMode={docsMode}
+                onToggleDocsMode={() => {
+                  setDocsMode((v) => !v);
+                  textareaRef.current?.focus();
+                }}
                 localMode={localMode}
                 onToggleLocalMode={isDesktop ? () => {
                   setLocalMode((v) => !v);
@@ -1301,6 +1324,15 @@ export const ChatPage = ({
                   <Search size={13} />
                   Knowledge base
                   <button type="button" onClick={() => setKbMode(false)} aria-label="Turn off knowledge base search">
+                    <X size={12} />
+                  </button>
+                </span>
+              )}
+              {docsMode && (
+                <span className="mode_chip" title="The reply can create Word and Excel files">
+                  <FileSpreadsheet size={13} />
+                  Word &amp; Excel
+                  <button type="button" onClick={() => setDocsMode(false)} aria-label="Turn off Word and Excel files">
                     <X size={12} />
                   </button>
                 </span>

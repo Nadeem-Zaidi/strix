@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { BookOpenText, Check, FolderOpen, HardDrive, ImagePlus, Paperclip, Plus, Search } from "lucide-react";
+import { BookOpenText, Check, FileSpreadsheet, FolderOpen, HardDrive, ImagePlus, Paperclip, Plus, Search } from "lucide-react";
 
 type AttachMenuProps = {
   onFilesSelected: (e: React.ChangeEvent<HTMLInputElement>) => void;
@@ -10,6 +10,9 @@ type AttachMenuProps = {
   // Desktop app only: answer from folders indexed on this computer.
   localMode?: boolean;
   onToggleLocalMode?: () => void;
+  // Word & Excel tools (an opt-in pack, so other messages stay small).
+  docsMode: boolean;
+  onToggleDocsMode: () => void;
   disabled?: boolean;
 };
 
@@ -24,6 +27,8 @@ export const AttachMenu = ({
   onToggleKbMode,
   localMode,
   onToggleLocalMode,
+  docsMode,
+  onToggleDocsMode,
   disabled,
 }: AttachMenuProps) => {
   const [open, setOpen] = useState(false);
@@ -118,6 +123,21 @@ export const AttachMenu = ({
               {localMode && <Check size={16} className="attach_menu__check" />}
             </button>
           )}
+
+          <button
+            type="button"
+            role="menuitemcheckbox"
+            aria-checked={docsMode}
+            className="attach_menu__item"
+            onClick={() => run(onToggleDocsMode)}
+          >
+            <span className="attach_menu__icon"><FileSpreadsheet size={16} /></span>
+            <span className="attach_menu__text">
+              <span className="attach_menu__label">Create Word &amp; Excel files</span>
+              <span className="attach_menu__hint">Let the reply make .docx and .xlsx files</span>
+            </span>
+            {docsMode && <Check size={16} className="attach_menu__check" />}
+          </button>
 
           <button type="button" role="menuitem" className="attach_menu__item" onClick={() => run(onExplainDocument)}>
             <span className="attach_menu__icon"><BookOpenText size={16} /></span>

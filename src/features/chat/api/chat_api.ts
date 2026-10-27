@@ -1,6 +1,7 @@
 import type { DocumentContent, KnowledgeDocument, LLMFileUploadResponse, LLMMessage, MessageUsage, Session, WhatsAppLinkCode, WhatsAppStatus } from "@/shared/types";
 import { workspaceHeaders } from "@/shared/lib/workspace";
 import { BaseApi } from "@/shared/api/base_fetch";
+import { localCommandHeaders, type LocalCommandResult } from "@/shared/lib/desktop";
 
 export type StreamChunk = {
     type:
@@ -99,6 +100,11 @@ class Api extends BaseApi {
         return await this.post<Session>("/new_session");
     }
 
+    // The desktop app's answer to a local command request (ran / denied / unavailable).
+    async answerLocalCommand(requestId: string, result: LocalCommandResult) {
+        return this.post<{ ok: true }>(`/local-commands/${encodeURIComponent(requestId)}`, result);
+    }
+
     async getProviders() {
         return await this.get<{ providers: LLMProviderOption[]; defaultProvider: string }>("/providers");
     }
@@ -111,7 +117,9 @@ class Api extends BaseApi {
         // Starts (or continues) a chat with this agent; the backend attaches it to the session.
         agentId?: string,
         // Same, for a provider agent (Claude Managed Agents / OpenAI Agents API).
-        nativeAgentId?: string
+        nativeAgentId?: string,
+        // Opt-in tool packs for this message ("documents" = Word & Excel).
+        toolPacks?: string[]
     ) {
         this.abortControllers.get(sessionId)?.abort();
         const controller = new AbortController();
@@ -120,7 +128,7 @@ class Api extends BaseApi {
         try {
             await this.stream(
                 "/chat_stream",
-                { currentSessionId: sessionId, llmMessage: message, provider: selection?.provider, model: selection?.model, agentId, nativeAgentId },
+                { currentSessionId: sessionId, llmMessage: message, provider: selection?.provider, model: selection?.model, agentId, nativeAgentId, toolPacks },
                 (_event, data) => onChunk(data as StreamChunk),
                 controller.signal
             );
@@ -322,7 +330,7 @@ class Api extends BaseApi {
         signal?: AbortSignal
     ) {
         const url = `${this.baseUrl}${path}`;
-        const headers = await this.getHeader();
+        const headers = { ...(await this.getHeader()), ...(await localCommandHeaders()) };
         const response = await fetch(url, {
             method: "POST",
             headers,

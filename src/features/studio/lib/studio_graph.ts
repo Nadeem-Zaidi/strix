@@ -166,6 +166,18 @@ export function edgeTaken(e: Edge, order: Map<string, number>, trace: Map<string
   return branch ? e.sourceHandle === branch : !e.sourceHandle;
 }
 
+// Agents wired side by side run as one parallel step in the workflow; its
+// branches are keyed by their agent node ids. Each becomes its own entry so
+// the agent cards and connections show their status like any other step.
+export function expandParallel(trace: FlowTraceEntry[]): FlowTraceEntry[] {
+  return trace.flatMap((t) => (t.type === "parallel" && t.branches
+    ? t.branches.map((b): FlowTraceEntry => ({
+      node_id: b.id, type: "agent", label: b.label, agent_name: b.agent_name, agent_icon: b.agent_icon,
+      status: b.status === "pending" ? "running" : b.status, output: b.output, error: b.error,
+    }))
+    : [t]));
+}
+
 export function traceByNode(trace: FlowTraceEntry[] | undefined): Map<string, FlowTraceEntry> {
   const m = new Map<string, FlowTraceEntry>();
   for (const t of trace ?? []) m.set(t.node_id, t);

@@ -1509,3 +1509,43 @@
     color: var(--accent);
     cursor: pointer;
 }
+
+/* Local commands (desktop app) and per-answer limits */
+.ag_builtin--danger.is_on {
+    border-color: var(--danger-border);
+    background: var(--danger-soft);
+}
+
+.ag_builtin__warn {
+    display: block;
+    margin-top: 6px;
+    color: var(--danger);
+}
+
+.ag_template_note {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.ag_template_note > span {
+    flex: 1;
+}
+
+.ag_limits {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.ag_limit {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+@media (max-width: 600px) {
+    .ag_limits {
+        grid-template-columns: 1fr;
+    }
+}

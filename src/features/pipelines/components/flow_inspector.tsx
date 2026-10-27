@@ -1,9 +1,9 @@
 import { useRef } from "react";
 import { Plus, Trash2, X } from "lucide-react";
 import { Field, Toggle } from "@/shared/ui/ui";
-import type { FlowNode } from "@/features/pipelines/api/pipelines_api";
+import type { FlowNode, ParallelBranch } from "@/features/pipelines/api/pipelines_api";
 import { providerLabel, stepKey, type StepAgent } from "@/features/pipelines/api/pipeline_agents";
-import { nodeLabel, TYPE_LABEL, type StepNode } from "@/features/pipelines/lib/flow_graph";
+import { MAX_PARALLEL_BRANCHES, newBranch, outputRefs, TYPE_LABEL, type StepNode } from "@/features/pipelines/lib/flow_graph";
 import { RouterEditor, RuleRow, SourceSelect } from "@/features/pipelines/components/router_editor";
 
 type Props = {
@@ -34,18 +34,91 @@ const TemplateField = ({ label, value, onChange, before, rows = 4, hint, max = 4
       <div className="wf_tokens">
         <button type="button" className="ag_chip ag_chip--button" onClick={() => insert("{{input}}")}>run input</button>
         <button type="button" className="ag_chip ag_chip--button" onClick={() => insert("{{previous}}")}>previous step</button>
-        {before.filter((b) => b.data.node.type === "agent").map((b) => (
-          <button key={b.id} type="button" className="ag_chip ag_chip--button" onClick={() => insert(`{{node.${b.id}}}`)}>{nodeLabel(b.data.node)}</button>
+        {outputRefs(before).map((o) => (
+          <button key={o.ref} type="button" className="ag_chip ag_chip--button" onClick={() => insert(`{{${o.ref}}}`)}>{o.label}</button>
         ))}
       </div>
     </Field>
   );
 };
 
-export const FlowInspector = ({ node, agents, before, onChange, onDelete, onClose, onCreateAgent }: Props) => {
-  const patch = (p: Partial<FlowNode>) => onChange({ ...node, ...p } as FlowNode);
+// Picks one of the user's agents (or provider agents) for a step.
+const AgentSelect = ({ kind, agentId, agents, onPick, onCreateAgent }: {
+  kind: "agent" | "native"; agentId: string; agents: StepAgent[];
+  onPick: (kind: "agent" | "native", id: string) => void; onCreateAgent?: () => void;
+}) => {
   const regular = agents.filter((a) => a.kind === "agent");
   const native = agents.filter((a) => a.kind === "native");
+  return (
+    <select className="ag_input" value={stepKey({ kind, agent_id: agentId })}
+      onChange={(e) => {
+        if (e.target.value === "__new__") return onCreateAgent?.();
+        const [k, ...rest] = e.target.value.split(":");
+        onPick(k as "agent" | "native", rest.join(":"));
+      }}>
+      {!agents.some((a) => a.id === agentId) && <option value={stepKey({ kind, agent_id: agentId })}>Choose an agent…</option>}
+      {onCreateAgent && <option value="__new__">＋ Create a new agent…</option>}
+      {regular.length > 0 && <optgroup label="Agents">{regular.map((a) => <option key={a.id} value={`agent:${a.id}`}>{a.icon} {a.name}</option>)}</optgroup>}
+      {native.length > 0 && (
+        <optgroup label="Provider agents">
+          {native.map((a) => <option key={a.id} value={`native:${a.id}`} disabled={!a.active}>{a.icon} {a.name} · {providerLabel(a.provider)}{a.active ? "" : " (switched off)"}</option>)}
+        </optgroup>
+      )}
+    </select>
+  );
+};
+
+// A parallel step: its agents (each with a name and a task) run at the same time.
+const ParallelEditor = ({ node, agents, before, onChange }: {
+  node: Extract<FlowNode, { type: "parallel" }>; agents: StepAgent[]; before: StepNode[]; onChange: (node: FlowNode) => void;
+}) => {
+  const setBranch = (i: number, p: Partial<ParallelBranch>) => onChange({ ...node, branches: node.branches.map((b, k) => (k === i ? { ...b, ...p } : b)) });
+  const labels = node.branches.map((b) => b.label.trim().toLowerCase());
+  return (
+    <>
+      <p className="ag_muted ag_small">
+        These agents work on the same input <strong>at the same time</strong>. The next step gets all their answers, each under its name —
+        or use one answer with its button below.
+      </p>
+      <ol className="wf_lanes">
+        {node.branches.map((b, i) => {
+          const dup = b.label.trim() && labels.filter((l) => l === b.label.trim().toLowerCase()).length > 1;
+          return (
+            <li key={b.id} className="wf_lane">
+              <div className="wf_lane__head">
+                <input className={`ag_input ${dup || !b.label.trim() ? "is_missing" : ""}`} value={b.label} maxLength={40} placeholder="Name, e.g. Research"
+                  aria-label={`Agent ${i + 1} name`} onChange={(e) => setBranch(i, { label: e.target.value })} />
+                <button type="button" className="ag_icon_btn" aria-label="Remove agent" disabled={node.branches.length <= 2}
+                  title={node.branches.length <= 2 ? "A parallel step needs at least two agents" : "Remove"}
+                  onClick={() => onChange({ ...node, branches: node.branches.filter((_, k) => k !== i) })}><Trash2 size={14} /></button>
+              </div>
+              {dup && <p className="ag_error ag_small">Two agents have this name.</p>}
+              <AgentSelect kind={b.agent_kind} agentId={b.agent_id} agents={agents}
+                onPick={(kind, id) => {
+                  // Names that were just the agent's name follow the new pick.
+                  const picked = agents.find((a) => a.id === id);
+                  const unnamed = !b.label.trim() || /^Agent \d+$/.test(b.label) || agents.some((a) => a.name.slice(0, 40) === b.label);
+                  setBranch(i, { agent_kind: kind, agent_id: id, ...(picked && unnamed ? { label: picked.name.slice(0, 40) } : {}) });
+                }} />
+              <TemplateField label="Task" value={b.instruction} onChange={(v) => setBranch(i, { instruction: v })} before={before} rows={3} />
+            </li>
+          );
+        })}
+      </ol>
+      {node.branches.length < MAX_PARALLEL_BRANCHES && (
+        <button type="button" className="wf_link_btn"
+          onClick={() => onChange({ ...node, branches: [...node.branches, newBranch(node.branches.length + 1, agents.find((a) => a.active && !node.branches.some((b) => b.agent_id === a.id)))] })}>
+          <Plus size={13} /> Add an agent
+        </button>
+      )}
+      <Toggle checked={!node.require_all} onChange={(v) => onChange({ ...node, require_all: !v })}
+        label={node.require_all ? "Stop the run if any agent fails" : "Continue if at least one agent answers"} />
+    </>
+  );
+};
+
+export const FlowInspector = ({ node, agents, before, onChange, onDelete, onClose, onCreateAgent }: Props) => {
+  const patch = (p: Partial<FlowNode>) => onChange({ ...node, ...p } as FlowNode);
 
   return (
     <div className="wf_inspector">
@@ -62,21 +135,8 @@ export const FlowInspector = ({ node, agents, before, onChange, onDelete, onClos
       {node.type === "agent" && (
         <>
           <Field label="Agent">
-            <select className="ag_input" value={stepKey({ kind: node.agent_kind, agent_id: node.agent_id })}
-              onChange={(e) => {
-                if (e.target.value === "__new__") return onCreateAgent?.();
-                const [kind, ...rest] = e.target.value.split(":");
-                patch({ agent_kind: kind as "agent" | "native", agent_id: rest.join(":") });
-              }}>
-              {!agents.some((a) => a.id === node.agent_id) && <option value={stepKey({ kind: node.agent_kind, agent_id: node.agent_id })}>Choose an agent…</option>}
-              {onCreateAgent && <option value="__new__">＋ Create a new agent…</option>}
-              {regular.length > 0 && <optgroup label="Agents">{regular.map((a) => <option key={a.id} value={`agent:${a.id}`}>{a.icon} {a.name}</option>)}</optgroup>}
-              {native.length > 0 && (
-                <optgroup label="Provider agents">
-                  {native.map((a) => <option key={a.id} value={`native:${a.id}`} disabled={!a.active}>{a.icon} {a.name} · {providerLabel(a.provider)}{a.active ? "" : " (switched off)"}</option>)}
-                </optgroup>
-              )}
-            </select>
+            <AgentSelect kind={node.agent_kind} agentId={node.agent_id} agents={agents} onCreateAgent={onCreateAgent}
+              onPick={(agent_kind, agent_id) => patch({ agent_kind, agent_id })} />
           </Field>
           {onCreateAgent && (
             <button type="button" className="wf_link_btn" onClick={onCreateAgent}><Plus size={13} /> New agent for this step</button>
@@ -85,6 +145,8 @@ export const FlowInspector = ({ node, agents, before, onChange, onDelete, onClos
             hint="Without any placeholder, the previous step's output is added at the end." />
         </>
       )}
+
+      {node.type === "parallel" && <ParallelEditor node={node} agents={agents} before={before} onChange={onChange} />}
 
       {node.type === "condition" && (
         <>

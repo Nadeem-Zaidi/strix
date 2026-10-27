@@ -1,4 +1,8 @@
-export type BuiltinTool = { id: string; label: string; description: string };
+// desktopOnly: run_local_command — offered only to app owners, for personal agents.
+export type BuiltinTool = { id: string; label: string; description: string; desktopOnly?: boolean };
+
+// Budget for one answer; empty = the server defaults (12 tool rounds, no time/token limit).
+export type AgentLimits = { max_rounds?: number; max_minutes?: number; max_tokens?: number };
 
 export type ProviderInfo = { id: string; label: string; defaultModel: string; models: string[] };
 
@@ -10,6 +14,8 @@ export type AgentCatalog = {
   codeFunctions: { enabled: boolean; canWrite: boolean; email: string | null };
   // Schedules can email their result when the server has SMTP set up.
   email?: { enabled: boolean; maxRecipients: number; accountEmail: string | null };
+  // Local commands (desktop app): only app owners may turn them on.
+  localCommands?: { canUse: boolean };
 };
 
 // A Markdown file attached to an agent; added to its instructions.
@@ -32,6 +38,7 @@ export type Agent = {
   skill_ids?: string[];
   // Other agents this one can ask (each becomes an ask_… tool).
   helper_agent_ids?: string[];
+  limits?: AgentLimits;
   // null = personal; otherwise shared with that team workspace.
   workspace_id?: string | null;
   // Whether you may change it (creator, or a workspace admin).
@@ -122,7 +129,7 @@ export type AgentRun = {
 
 export type AgentDetail = Agent & { functions: AgentFunction[]; codeFunctions: CodeFunction[]; mcpServers: McpServer[]; schedules: Schedule[] };
 
-export type AgentInput = Pick<Agent, "name" | "icon" | "description" | "instructions" | "provider" | "model" | "builtin_tools" | "document_keys" | "starters" | "instruction_files" | "skill_mode" | "skill_ids" | "helper_agent_ids">;
+export type AgentInput = Pick<Agent, "name" | "icon" | "description" | "instructions" | "provider" | "model" | "builtin_tools" | "document_keys" | "starters" | "instruction_files" | "skill_mode" | "skill_ids" | "helper_agent_ids" | "limits">;
 
 export type AgentDraft = Pick<Agent, "name" | "icon" | "description" | "instructions" | "builtin_tools" | "starters">;
 

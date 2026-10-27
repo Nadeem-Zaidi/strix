@@ -227,6 +227,9 @@ export const AuthMain = () => {
     const handleGoogle = async () => {
         try {
             const provider = new GoogleAuthProvider();
+            // Always show Google's account chooser, so signing out and back in
+            // can switch to another Gmail account (Google otherwise reuses the last one).
+            provider.setCustomParameters({ prompt: "select_account" });
             const result = await signInWithPopup(auth, provider);
             const profile = await loadProfile(result.user.uid, result.user.email);
             if (!profile || !result.user.phoneNumber) {

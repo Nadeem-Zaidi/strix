@@ -1,5 +1,5 @@
 import type { Edge, Node } from "@xyflow/react";
-import type { Branch, Flow, FlowNode, FlowTraceEntry, NodeType, Route } from "@/features/pipelines/api/pipelines_api";
+import type { Branch, Flow, FlowNode, FlowTraceEntry, NodeType, ParallelBranch, Route } from "@/features/pipelines/api/pipelines_api";
 import type { StepAgent } from "@/features/pipelines/api/pipeline_agents";
 
 // The workflow editor works on React Flow nodes/edges; the server stores a
@@ -7,11 +7,12 @@ import type { StepAgent } from "@/features/pipelines/api/pipeline_agents";
 // components share.
 
 export type RunStatus = FlowTraceEntry["status"];
-export type StepNodeData = { node: FlowNode; status?: RunStatus; agent?: StepAgent };
+// `branchAgents`: a parallel step's agents, in branch order.
+export type StepNodeData = { node: FlowNode; status?: RunStatus; agent?: StepAgent; branchAgents?: (StepAgent | undefined)[] };
 export type StepNode = Node<StepNodeData>;
 
 export const TYPE_LABEL: Record<NodeType, string> = {
-  start: "Start", agent: "Agent", condition: "Condition", router: "Router", approval: "Approval", notify: "Notify", end: "End",
+  start: "Start", agent: "Agent", parallel: "Parallel", condition: "Condition", router: "Router", approval: "Approval", notify: "Notify", end: "End",
 };
 
 const FIXED_BRANCH: Record<string, string> = { true: "Yes", false: "No", approved: "Approved", rejected: "Rejected", default: "Otherwise" };
@@ -72,11 +73,27 @@ export const newRoute = (n: number, mode: "rule" | "ai"): Route => ({
   ...(mode === "ai" ? { description: "" } : {}),
 });
 
-export function newNode(type: NodeType, position: { x: number; y: number }, agent?: StepAgent): FlowNode {
+export const MAX_PARALLEL_BRANCHES = 5;
+
+export const newBranch = (n: number, agent?: StepAgent): ParallelBranch => ({
+  id: `b_${Math.random().toString(36).slice(2, 8)}`,
+  label: agent?.name.slice(0, 40) || `Agent ${n}`,
+  agent_kind: agent?.kind ?? "agent",
+  agent_id: agent?.id ?? "",
+  instruction: "{{previous}}",
+});
+
+// `agents`: the usable agents (a parallel step starts with the first two).
+export function newNode(type: NodeType, position: { x: number; y: number }, agent?: StepAgent, agents: StepAgent[] = []): FlowNode {
   const id = newId(type);
   switch (type) {
     case "agent":
       return { id, type, position, agent_kind: agent?.kind ?? "agent", agent_id: agent?.id ?? "", instruction: "{{previous}}" };
+    case "parallel": {
+      const a = newBranch(1, agents[0]), b = newBranch(2, agents[1]);
+      if (a.label === b.label) b.label = `${b.label} 2`.slice(0, 40);
+      return { id, type, position, branches: [a, b], require_all: true };
+    }
     case "condition":
       return { id, type, position, mode: "rule", source: "previous", op: "contains", value: "" };
     case "router":
@@ -99,6 +116,20 @@ export function starterFlow(agent?: StepAgent): Flow {
   if (!agent) return { version: 1, nodes: [start, end], edges: [{ id: "start-end", from: "start", to: "end" }] };
   const a: FlowNode = { id: "agent_1", type: "agent", position: { x: 0, y: 150 }, agent_kind: agent.kind, agent_id: agent.id, instruction: "{{input}}" };
   return { version: 1, nodes: [start, a, end], edges: [{ id: "start-agent_1", from: "start", to: "agent_1" }, { id: "agent_1-end", from: "agent_1", to: "end" }] };
+}
+
+// The outputs a later step can use: agent steps, and each parallel step
+// (all answers) plus each of its agents.
+export function outputRefs(before: StepNode[]): { ref: string; label: string }[] {
+  return before.flatMap((b) => {
+    const n = b.data.node;
+    if (n.type === "agent") return [{ ref: `node.${b.id}`, label: nodeLabel(n) }];
+    if (n.type === "parallel") {
+      return [{ ref: `node.${b.id}`, label: `${nodeLabel(n)} (all)` },
+        ...n.branches.map((br) => ({ ref: `node.${b.id}.${br.id}`, label: `${nodeLabel(n)} → ${br.label || "Agent"}` }))];
+    }
+    return [];
+  });
 }
 
 // Steps that run before `id` (for {{node.<id>}} buttons and condition sources).

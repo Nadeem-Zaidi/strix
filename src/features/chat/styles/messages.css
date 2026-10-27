@@ -521,6 +521,25 @@
     white-space: pre;
 }
 
+.code_actions {
+    display: inline-flex;
+    gap: 12px;
+}
+
+/* Markdown that came inside a ``` block, shown formatted. */
+.md_block {
+    padding: 4px 16px;
+    background: var(--bg-code);
+    color: var(--text-pri);
+    overflow-x: auto;
+}
+
+/* Plain text in a ``` block (no language): wrap long lines instead of scrolling. */
+.code_block_wrapper--text code {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
 .inline_code {
     padding: 1.5px 5px;
     border-radius: 4px;
@@ -1040,3 +1059,47 @@
 
 .used_chip--skill { border-color: var(--accent-border); background: var(--accent-soft); }
 .used_chip--skill svg { color: var(--accent); }
+
+/* A command an agent asked to run on this computer (desktop app) */
+.lc_card.is_failed {
+    border-color: var(--danger, #c0392b);
+}
+
+.lc_command {
+    display: block;
+    padding: 6px 8px;
+    border-radius: 8px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-size: 12.5px;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.lc_output summary {
+    cursor: pointer;
+    font-size: 12.5px;
+    color: var(--text-sec);
+}
+
+.lc_output pre {
+    max-height: 280px;
+    overflow: auto;
+    margin: 6px 0 0;
+    padding: 8px;
+    border-radius: 8px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    font-size: 12px;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.lc_spin {
+    animation: lc_spin 1s linear infinite;
+}
+
+@keyframes lc_spin {
+    to { transform: rotate(360deg); }
+}

@@ -97,17 +97,34 @@ export const FlowRunPanel = ({ canRun, blockedReason, starting, onRun, save, act
           <ol className="pl_timeline">
             {trace.map((s, i) => (
               <li key={i} className={`pl_tl pl_tl--${s.status}`}>
-                <button type="button" className="pl_tl__head" onClick={() => setOpen(open === i ? null : i)} disabled={!s.output && !s.error}>
+                <button type="button" className="pl_tl__head" onClick={() => setOpen(open === i ? null : i)} disabled={!s.output && !s.error && !s.branches}>
                   <Icon status={s.status} />
                   <span className="pl_tl__agent">{s.agent_icon && <AgentAvatar icon={s.agent_icon} />} {s.label}</span>
                   {s.branch && <span className={`wf_branch wf_branch--${branchClass(s.branch)}`}>{s.branch_label ?? branchLabel(s.branch)}</span>}
-                  {(s.output || s.error) && <ChevronDown size={14} className={open === i ? "ag_rot" : ""} />}
+                  {s.branches && s.status === "running" && (
+                    <span className="ag_muted ag_small">{s.branches.filter((b) => b.status !== "running").length}/{s.branches.length} done</span>
+                  )}
+                  {(s.output || s.error || s.branches) && <ChevronDown size={14} className={open === i ? "ag_rot" : ""} />}
                 </button>
                 {open === i && (
                   <div className="pl_tl__body">
                     {s.error && <div className="ag_error">{s.error}</div>}
                     {s.decided_by && <p className="ag_muted ag_small">{s.status === "rejected" ? "Rejected" : "Approved"} by {s.decided_by}{s.comment ? ` — “${s.comment}”` : ""}</p>}
-                    {s.output && <MarkdownOutput text={s.output} />}
+                    {s.branches ? (
+                      <ul className="wf_lanes_run">
+                        {s.branches.map((b) => (
+                          <li key={b.id} className={`wf_lane_run wf_lane_run--${b.status}`}>
+                            <div className="wf_lane_run__head">
+                              <Icon status={b.status === "pending" ? "skipped" : b.status} />
+                              {b.agent_icon && <AgentAvatar icon={b.agent_icon} />} <strong>{b.label}</strong>
+                              <span className="ag_muted ag_small">{b.agent_name}</span>
+                            </div>
+                            {b.error && <div className="ag_error">{b.error}</div>}
+                            {b.output && <MarkdownOutput text={b.output} />}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : s.output && <MarkdownOutput text={s.output} />}
                   </div>
                 )}
               </li>

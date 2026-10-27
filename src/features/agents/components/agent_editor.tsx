@@ -1,13 +1,15 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { DEV_SETUP_TEMPLATE } from "@/features/agents/lib/dev_setup_template";
+import { activeWorkspaceId } from "@/shared/lib/workspace";
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   Activity, ArrowLeft, CalendarClock, Check, ChevronDown, Clock, ExternalLink, FileText, Globe, Lock, MessageSquare,
-  Code2, Pause, Pencil, Play, Plug, Plus, RefreshCw, Search, Settings2, Sparkles, Trash2, Wrench, X,
+  Code2, Pause, Pencil, Play, Plug, Plus, RefreshCw, Search, Settings2, Sparkles, TerminalSquare, Trash2, Wrench, X,
 } from "lucide-react";
 import { api } from "@/features/chat/api/chat_api";
 import type { KnowledgeDocument } from "@/shared/types";
 import { agentsApi } from "@/features/agents/api/agents_api";
-import type { AgentCatalog, AgentDetail, AgentFunction, AgentInput, AgentRun, CodeFunction, McpServer, Schedule } from "@/features/agents/types";
+import type { AgentCatalog, AgentDetail, AgentFunction, AgentInput, AgentLimits, AgentRun, CodeFunction, McpServer, Schedule } from "@/features/agents/types";
 import { CodeFunctionDialog } from "@/features/agents/components/code_function_dialog";
 import { FunctionDialog } from "@/features/agents/components/function_dialog";
 import { McpDialog } from "@/features/agents/components/mcp_dialog";
@@ -24,7 +26,7 @@ type Tab = "configure" | "tools" | "schedules" | "activity";
 
 const EMOJIS = ["🤖", "🧠", "🦉", "📚", "🧾", "🎓", "💼", "📰", "🛠️", "🔍", "📈", "💡", "✍️", "🧪", "🗂️", "📅", "🌐", "🛡️", "💬", "🎯", "⚙️", "📦", "🧭", "🚀"];
 
-const EMPTY: AgentInput = { name: "", icon: "🤖", description: "", instructions: "", provider: null, model: null, builtin_tools: ["search_knowledge_base"], document_keys: [], starters: [], instruction_files: [], skill_mode: "all", skill_ids: [], helper_agent_ids: [] };
+const EMPTY: AgentInput = { name: "", icon: "🤖", description: "", instructions: "", provider: null, model: null, builtin_tools: ["search_knowledge_base"], document_keys: [], starters: [], instruction_files: [], skill_mode: "all", skill_ids: [], helper_agent_ids: [], limits: {} };
 
 const fmtDate = (iso: string | null) => (iso ? new Date(iso).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }) : "—");
 const relative = (iso: string | null) => {
@@ -76,6 +78,7 @@ export const AgentEditor = () => {
           instruction_files: d.instruction_files ?? [],
           skill_mode: d.skill_mode ?? "all", skill_ids: d.skill_ids ?? [],
           helper_agent_ids: d.helper_agent_ids ?? [],
+          limits: d.limits ?? {},
         };
         setForm(input);
         setSaved(input);
@@ -198,6 +201,8 @@ export const AgentEditor = () => {
           setDescribe={setDescribe}
           drafting={drafting}
           onGenerate={generate}
+          team={isNew ? !!activeWorkspaceId() : !!detail?.workspace_id}
+          onTemplate={() => setForm((f) => ({ ...f, ...DEV_SETUP_TEMPLATE }))}
         />
       )}
       {tab === "tools" && detail && <ToolsTab detail={detail} setDetail={setDetail} catalog={catalog} />}
@@ -220,7 +225,7 @@ export const AgentEditor = () => {
 };
 
 // ── Configure ────────────────────────────────────────────────────────────
-const ConfigureTab = ({ isNew, agentId, form, set, catalog, documents, describe, setDescribe, drafting, onGenerate }: {
+const ConfigureTab = ({ isNew, agentId, form, set, catalog, documents, describe, setDescribe, drafting, onGenerate, team, onTemplate }: {
   isNew: boolean;
   agentId?: string;
   form: AgentInput;
@@ -231,6 +236,9 @@ const ConfigureTab = ({ isNew, agentId, form, set, catalog, documents, describe,
   setDescribe: (v: string) => void;
   drafting: boolean;
   onGenerate: () => void;
+  // A team workspace agent: local commands are never offered.
+  team: boolean;
+  onTemplate: () => void;
 }) => {
   const [emojiOpen, setEmojiOpen] = useState(false);
   const [describeOpen, setDescribeOpen] = useState(isNew);
@@ -238,6 +246,14 @@ const ConfigureTab = ({ isNew, agentId, form, set, catalog, documents, describe,
   const scoped = form.document_keys.length > 0;
   const filteredDocs = useMemo(() => documents.filter((d) => d.name.toLowerCase().includes(docQuery.toLowerCase())), [documents, docQuery]);
   const toolOn = (id: string) => form.builtin_tools.includes(id);
+  const canLocal = !!catalog.localCommands?.canUse && !team;
+  // Owners see the desktop-only tool; others only if it's already on (so they can turn it off).
+  const builtins = catalog.builtinTools.filter((t) => !t.desktopOnly || canLocal || toolOn(t.id));
+  const limits = form.limits ?? {};
+  const setLimit = (k: keyof AgentLimits, v: string) => {
+    const n = v.trim() === "" ? undefined : Number(v);
+    set("limits", { ...limits, [k]: n });
+  };
   const modelValue = form.provider && form.model ? `${form.provider}::${form.model}` : "";
   const providerLabel = catalog.providers.find((p) => p.id === (form.provider ?? catalog.defaultProvider))?.label;
 
@@ -273,6 +289,14 @@ const ConfigureTab = ({ isNew, agentId, form, set, catalog, documents, describe,
             </div>
           )}
         </section>
+
+        {isNew && canLocal && (
+          <div className="ag_note ag_template_note">
+            <TerminalSquare size={16} />
+            <span><strong>Dev machine setup</strong> — a ready-made agent that installs and checks developer tools on your computer (desktop app), one approved command at a time.</span>
+            <Button variant="ghost" onClick={onTemplate}>Use template</Button>
+          </div>
+        )}
 
         <section className="ag_section">
           <h2 className="ag_section__title">Identity</h2>
@@ -369,17 +393,45 @@ const ConfigureTab = ({ isNew, agentId, form, set, catalog, documents, describe,
         <section className="ag_section">
           <h2 className="ag_section__title">Built-in tools</h2>
           <div className="ag_builtins">
-            {catalog.builtinTools.map((t) => (
-              <div key={t.id} className={`ag_builtin ${toolOn(t.id) ? "is_on" : ""}`}>
+            {builtins.map((t) => (
+              <div key={t.id} className={`ag_builtin ${toolOn(t.id) ? "is_on" : ""} ${t.desktopOnly ? "ag_builtin--danger" : ""}`}>
                 <div>
                   <strong>{t.label}</strong>
                   <span className="ag_muted ag_small">{t.description}</span>
+                  {t.desktopOnly && toolOn(t.id) && (
+                    <span className="ag_small ag_builtin__warn">
+                      Works only when you chat with this agent in the Owl Bot desktop app, with “Allow agents to run commands” switched on in its tray menu.
+                      Commands run as you on your computer — read each one before pressing “Run once”.
+                    </span>
+                  )}
                 </div>
                 <Toggle label={t.label} checked={toolOn(t.id)} onChange={(v) => set("builtin_tools", v ? [...form.builtin_tools, t.id] : form.builtin_tools.filter((x) => x !== t.id))} />
               </div>
             ))}
           </div>
           <p className="ag_muted ag_small">Connect APIs and MCP servers in the <strong>Tools</strong> tab{isNew ? " after creating the agent" : ""}.</p>
+        </section>
+
+        <section className="ag_section">
+          <h2 className="ag_section__title">Limits per answer</h2>
+          <p className="ag_muted ag_small">
+            Stops a long run with a progress report instead of going on forever. Leave empty for the defaults (12 tool rounds, no time or token limit).
+            Raise the rounds for agents that work through many steps, like machine setup.
+          </p>
+          <div className="ag_limits">
+            <label className="ag_limit">
+              <span className="ag_small">Tool rounds</span>
+              <input className="ag_input" type="number" min={1} max={50} placeholder="12" value={limits.max_rounds ?? ""} onChange={(e) => setLimit("max_rounds", e.target.value)} />
+            </label>
+            <label className="ag_limit">
+              <span className="ag_small">Minutes</span>
+              <input className="ag_input" type="number" min={1} max={120} placeholder="No limit" value={limits.max_minutes ?? ""} onChange={(e) => setLimit("max_minutes", e.target.value)} />
+            </label>
+            <label className="ag_limit">
+              <span className="ag_small">Tokens</span>
+              <input className="ag_input" type="number" min={10000} max={5000000} step={10000} placeholder="No limit" value={limits.max_tokens ?? ""} onChange={(e) => setLimit("max_tokens", e.target.value)} />
+            </label>
+          </div>
         </section>
 
         <section className="ag_section">

@@ -4,7 +4,7 @@ import {
   addEdge, applyEdgeChanges, applyNodeChanges, Background, Controls, ReactFlow,
   type Connection, type Edge, type EdgeChange, type NodeChange,
 } from "@xyflow/react";
-import { ArrowLeft, Bell, Bot, Check, Flag, GitFork, Info, Route as RouteIcon, ShieldCheck } from "lucide-react";
+import { ArrowLeft, Bell, Bot, Check, Columns3, Flag, GitFork, Info, Route as RouteIcon, ShieldCheck } from "lucide-react";
 import { Button, ErrorNote } from "@/shared/ui/ui";
 import { loadStepAgents, stepKey, type StepAgent } from "@/features/pipelines/api/pipeline_agents";
 import { pipelinesApi, type Flow, type FlowNode, type NodeType, type PipelineRun } from "@/features/pipelines/api/pipelines_api";
@@ -21,6 +21,7 @@ const errorText = (e: unknown, fallback: string) => (e instanceof Error && e.mes
 
 const ADD: { type: NodeType; label: string; icon: React.ReactNode }[] = [
   { type: "agent", label: "Agent", icon: <Bot size={15} /> },
+  { type: "parallel", label: "Parallel", icon: <Columns3 size={15} /> },
   { type: "condition", label: "Condition", icon: <GitFork size={15} /> },
   { type: "router", label: "Router", icon: <RouteIcon size={15} /> },
   { type: "approval", label: "Approval", icon: <ShieldCheck size={15} /> },
@@ -107,7 +108,8 @@ export const WorkflowEditor = () => {
   const shown = useMemo(() => nodes.map((n) => {
     const node = n.data.node;
     const agent = node.type === "agent" ? agentByKey.get(stepKey({ kind: node.agent_kind, agent_id: node.agent_id })) : undefined;
-    return { ...n, selected: n.id === selectedId, data: { ...n.data, agent, status: status.get(n.id) } };
+    const branchAgents = node.type === "parallel" ? node.branches.map((b) => agentByKey.get(stepKey({ kind: b.agent_kind, agent_id: b.agent_id }))) : undefined;
+    return { ...n, selected: n.id === selectedId, data: { ...n.data, agent, branchAgents, status: status.get(n.id) } };
   }), [nodes, agentByKey, status, selectedId]);
 
   // Edge labels follow the current route names.
@@ -139,7 +141,7 @@ export const WorkflowEditor = () => {
   const addStep = (type: NodeType) => {
     const anchor = selected ?? nodes.reduce<StepNode | null>((low, n) => (!low || n.position.y > low.position.y ? n : low), null);
     const position = anchor ? { x: anchor.position.x + (selected ? 0 : 40), y: anchor.position.y + 150 } : { x: 0, y: 0 };
-    const node = newNode(type, position, agents.find((a) => a.active));
+    const node = newNode(type, position, agents.find((a) => a.active), agents.filter((a) => a.active));
     setNodes((ns) => [...ns, { id: node.id, type: "step", position, data: { node }, deletable: true }]);
     setSelectedId(node.id);
     layout.openPanel();
